@@ -176,7 +176,7 @@ a{color:var(--bar)}
 footer{color:var(--muted);font-size:.8rem;margin-top:2rem}
 </style></head><body><main>
 <h1>JavaScript/TypeScript to native binary</h1>
-<p class="sub">Runtimes that execute directly (Node, Bun, Deno) against compilers that emit a native binary (scriptc, Porffor, Perry), measured on execution time, peak memory, binary size, compile time and coverage.</p>
+<p class="sub">Runtimes that execute directly (Node, Bun, Deno) against compilers that emit a native binary (scriptc, Porffor), measured on execution time, peak memory, binary size, compile time and coverage.</p>
 
 <section><h2>Run</h2>
 <dl class="env">

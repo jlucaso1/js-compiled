@@ -42,13 +42,6 @@ export const RUNNERS = {
     compile: (file, out) => ["node", PORFFOR, "native", "--module", "-t", file, "-o", out],
   },
 
-  perry: {
-    label: "Perry",
-    tier: "core",
-    mode: "compiled",
-    version: [BIN("perry"), "--version"],
-    compile: (file, out) => [BIN("perry"), "compile", file, "-o", out],
-  },
 
   "scriptc-dynamic": {
     label: "scriptc --dynamic",

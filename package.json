@@ -11,7 +11,6 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@perryts/perry": "^0.5.1220",
     "scriptc": "^0.0.35"
   },
   "allowScripts": {
