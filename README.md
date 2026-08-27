@@ -117,6 +117,11 @@ HTTP throughput, startup under I/O load, container image size, energy use.
 - `scriptc --dynamic` still rejects `SC2011` (`any`-typed operator) even though
   `scriptc coverage --dynamic` reports the site as compilable — so `31-json` fails
   to build in both scriptc modes.
+- Perry needs ~6.2 GB of RSS for `23-binary-trees`, where Node needs 263 MB, and
+  keeps allocating past that. On the first CI run it took the whole agent down.
+  The harness now raises its own `oom_score_adj` — children inherit it, so the
+  kernel kills the runaway process instead of the machine — and writes the result
+  file incrementally so a killed job still yields a usable shard.
 
 ## Layout
 

@@ -85,6 +85,12 @@ for (const name of opts.runners) {
   else active.push(name);
 }
 
+// Children inherit oom_score_adj, so a runner that blows up gets picked by the
+// OOM killer instead of the machine (or the CI agent) going down with it.
+try {
+  writeFileSync("/proc/self/oom_score_adj", "1000");
+} catch {}
+
 const clean = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const firstLines = (t, n = 4) => clean(t).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, n).join(" | ");
 
@@ -166,6 +172,10 @@ const results = {
   benches: {},
 };
 
+const outPath = opts.out ?? path.join(RESULT_DIR, "latest.json");
+mkdirSync(path.dirname(outPath), { recursive: true });
+const flush = () => writeFileSync(outPath, JSON.stringify(results, null, 2) + "\n");
+
 for (const bench of benches) {
   const entry = { file: bench, sourceBytes: statSync(path.join(BENCH_DIR, bench)).size, runners: {} };
   results.benches[bench] = entry;
@@ -187,6 +197,7 @@ for (const bench of benches) {
       if (!b.ok) {
         Object.assign(rec, { status: "build-failed", error: b.error });
         console.log(`BUILD FAILED  ${(b.error ?? "").slice(0, 80)}`);
+        flush();
         continue;
       }
       argv = [b.outPath];
@@ -204,6 +215,7 @@ for (const bench of benches) {
         error: check.timedOut ? `timeout > ${opts.timeout}s` : firstLines(check.stderr || check.stdout),
       });
       console.log(`${rec.status.toUpperCase()}  ${(rec.error ?? "").slice(0, 80)}`);
+      flush();
       continue;
     }
     if (name === "node" || reference === null) reference = rec.output;
@@ -228,6 +240,7 @@ for (const bench of benches) {
     }
     rec.maxRssKb = rss.length ? Math.max(...rss) : null;
 
+    flush();
     const t = rec.time;
     console.log(
       (t ? `${t.median.toFixed(1)} ms` : "n/a").padStart(11) +
@@ -240,7 +253,5 @@ for (const bench of benches) {
 }
 
 results.meta.finishedAt = new Date().toISOString();
-const outPath = opts.out ?? path.join(RESULT_DIR, "latest.json");
-mkdirSync(path.dirname(outPath), { recursive: true });
-writeFileSync(outPath, JSON.stringify(results, null, 2) + "\n");
+flush();
 console.log(`\nwrote ${outPath}`);

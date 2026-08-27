@@ -85,7 +85,10 @@ jobs:
             --build-timeout=300 \
             --out="results/shards/${{ matrix.bench }}.json"
 
+      # Upload even when a runner takes the job down: the shard is written
+      # incrementally, so partial results are still worth keeping.
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: shard-${{ matrix.bench }}
           path: results/shards/*.json
