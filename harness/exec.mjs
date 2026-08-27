@@ -1,46 +1,96 @@
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 const GNU_TIME = "/usr/bin/time";
+const MAX_OUTPUT = 8 * 1024 * 1024;
+const POLL_MS = 100;
 
-const base = (cwd, timeoutMs) => ({
-  cwd,
-  timeout: timeoutMs,
-  encoding: "utf8",
-  maxBuffer: 64 * 1024 * 1024,
-});
-
-// Wall clock via hrtime: GNU time only resolves to 10ms, useless for a binary
-// that runs in 1ms.
-export function timeRun(argv, { cwd, timeoutMs = 300000 } = {}) {
-  const t0 = process.hrtime.bigint();
-  const r = spawnSync(argv[0], argv.slice(1), base(cwd, timeoutMs));
-  const t1 = process.hrtime.bigint();
-  const timedOut = r.error?.code === "ETIMEDOUT" || r.signal === "SIGTERM";
-  return {
-    wallMs: Number(t1 - t0) / 1e6,
-    exitCode: r.status,
-    stdout: r.stdout ?? "",
-    stderr: r.stderr ?? "",
-    timedOut,
-    ok: !timedOut && !r.error && r.status === 0,
-  };
+function rssKb(pid) {
+  try {
+    const m = /VmRSS:\s+(\d+) kB/.exec(readFileSync(`/proc/${pid}/status`, "utf8"));
+    return m ? Number(m[1]) : 0;
+  } catch {
+    return 0;
+  }
 }
 
-// Peak RSS of the process and its children, measured in a separate run.
-export function rssRun(argv, { cwd, timeoutMs = 300000 } = {}) {
+// A runner may sit under a wrapper (GNU time), so charge it for the whole tree.
+function treeRssKb(pid, depth = 0) {
+  let total = rssKb(pid);
+  if (depth > 3) return total;
+  try {
+    for (const tid of readdirSync(`/proc/${pid}/task`)) {
+      for (const child of readFileSync(`/proc/${pid}/task/${tid}/children`, "utf8").trim().split(/\s+/)) {
+        if (child) total += treeRssKb(Number(child), depth + 1);
+      }
+    }
+  } catch {}
+  return total;
+}
+
+function run(argv, { cwd, timeoutMs = 300000, memLimitKb = 0 } = {}) {
+  return new Promise((resolve) => {
+    const t0 = process.hrtime.bigint();
+    const child = spawn(argv[0], argv.slice(1), { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let memExceeded = false;
+    let peakKb = 0;
+
+    const capture = (stream, append) => {
+      stream.setEncoding("utf8");
+      stream.on("data", (c) => append(c));
+    };
+    capture(child.stdout, (c) => { if (stdout.length < MAX_OUTPUT) stdout += c; });
+    capture(child.stderr, (c) => { if (stderr.length < MAX_OUTPUT) stderr += c; });
+
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, timeoutMs);
+    const poll = child.pid
+      ? setInterval(() => {
+          const kb = treeRssKb(child.pid);
+          if (kb > peakKb) peakKb = kb;
+          if (memLimitKb && kb > memLimitKb) { memExceeded = true; child.kill("SIGKILL"); }
+        }, POLL_MS)
+      : null;
+
+    const done = (code, signal, spawnError) => {
+      clearTimeout(timer);
+      if (poll) clearInterval(poll);
+      resolve({
+        wallMs: Number(process.hrtime.bigint() - t0) / 1e6,
+        exitCode: code,
+        signal,
+        stdout,
+        stderr,
+        timedOut,
+        memExceeded,
+        peakKb,
+        spawnError,
+        ok: !timedOut && !memExceeded && !spawnError && code === 0,
+      });
+    };
+    child.on("error", (e) => done(null, null, String(e.message)));
+    child.on("close", (code, signal) => done(code, signal, null));
+  });
+}
+
+export const timeRun = run;
+
+// Peak RSS from GNU time, which samples the kernel counter rather than polling.
+export async function rssRun(argv, opts = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "bench-rss-"));
   const outFile = path.join(dir, "time.txt");
   try {
-    const r = spawnSync(GNU_TIME, ["-f", "%M", "-o", outFile, "--", ...argv], base(cwd, timeoutMs));
+    const r = await run([GNU_TIME, "-f", "%M", "-o", outFile, "--", ...argv], opts);
     let maxRssKb = null;
     try {
       const raw = readFileSync(outFile, "utf8").trim().split("\n").pop() ?? "";
       if (/^\d+$/.test(raw)) maxRssKb = Number(raw);
     } catch {}
-    return { maxRssKb, ok: r.status === 0 && maxRssKb !== null };
+    return { maxRssKb, ok: r.ok && maxRssKb !== null, memExceeded: r.memExceeded };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

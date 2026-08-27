@@ -21,6 +21,7 @@ const opts = {
   rssRuns: 2,
   timeout: 300,
   buildTimeout: 300,
+  memLimitMb: 4096,
   out: null,
   list: false,
 };
@@ -35,6 +36,7 @@ for (const a of process.argv.slice(2)) {
   else if (k === "--rss-runs") opts.rssRuns = Number(v);
   else if (k === "--timeout") opts.timeout = Number(v);
   else if (k === "--build-timeout") opts.buildTimeout = Number(v);
+  else if (k === "--mem-limit-mb") opts.memLimitMb = Number(v);
   else if (k === "--out") opts.out = v;
   else if (k === "--list") opts.list = true;
   else if (k === "--quick") Object.assign(opts, { runs: 1, warmup: 0, rssRuns: 1 });
@@ -48,6 +50,7 @@ for (const a of process.argv.slice(2)) {
   --rss-runs=N       runs under GNU time for peak RSS (default 2)
   --timeout=S        per-run timeout in seconds (default 300)
   --build-timeout=S  per-build timeout in seconds (default 300)
+  --mem-limit-mb=N   kill a run above this RSS, 0 disables (default 4096)
   --quick            --runs=1 --warmup=0 --rss-runs=1
   --out=FILE         result JSON path
   --list             list benches and runners`);
@@ -85,8 +88,8 @@ for (const name of opts.runners) {
   else active.push(name);
 }
 
-// Children inherit oom_score_adj, so a runner that blows up gets picked by the
-// OOM killer instead of the machine (or the CI agent) going down with it.
+// Backstop for the RSS watchdog: children inherit oom_score_adj, so if a runner
+// outruns the poll interval the kernel picks it, not the machine.
 try {
   writeFileSync("/proc/self/oom_score_adj", "1000");
 } catch {}
@@ -94,8 +97,10 @@ try {
 const clean = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const firstLines = (t, n = 4) => clean(t).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, n).join(" | ");
 
-function version(name) {
-  const r = timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
+const limitKb = opts.memLimitMb * 1024;
+
+async function version(name) {
+  const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
   return clean(r.stdout + r.stderr).trim().split("\n")[0]?.trim() || "unknown";
 }
 
@@ -110,14 +115,15 @@ function sourceFor(runner, bench) {
   return out;
 }
 
-function build(name, runner, bench) {
+async function build(name, runner, bench) {
   const outDir = path.join(BUILD_DIR, name);
   mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, path.basename(bench).replace(/\.(ts|js)$/, ""));
   rmSync(outPath, { force: true });
-  const r = timeRun(runner.compile(sourceFor(runner, bench), outPath), {
+  const r = await timeRun(runner.compile(sourceFor(runner, bench), outPath), {
     cwd: BUILD_DIR,
     timeoutMs: opts.buildTimeout * 1000,
+    memLimitKb: limitKb,
   });
   if (!existsSync(outPath)) {
     return { ok: false, buildMs: r.wallMs, error: r.timedOut ? "build timeout" : firstLines(r.stderr || r.stdout) || `exit ${r.exitCode}` };
@@ -137,11 +143,11 @@ function resultLine(stdout) {
 mkdirSync(BUILD_DIR, { recursive: true });
 mkdirSync(RESULT_DIR, { recursive: true });
 
-const versions = Object.fromEntries(active.map((n) => [n, version(n)]));
+const versions = Object.fromEntries(await Promise.all(active.map(async (n) => [n, await version(n)])));
 const porfforDir = path.join(ROOT, "vendor", "porffor");
 let porfforCommit = null;
 if (existsSync(path.join(porfforDir, ".git"))) {
-  const r = timeRun(["git", "-C", porfforDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
+  const r = await timeRun(["git", "-C", porfforDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
   if (r.ok) porfforCommit = r.stdout.trim();
 }
 
@@ -151,7 +157,9 @@ if (porfforCommit) console.log(`  ${"porffor commit".padEnd(17)} ${porfforCommit
 console.log(`  benches ${benches.length} · runs ${opts.runs} (warmup ${opts.warmup}) · rss runs ${opts.rssRuns}`);
 console.log("=".repeat(72));
 
-const spawnOverhead = stats(Array.from({ length: 20 }, () => timeRun(["/bin/true"], { timeoutMs: 5000 }).wallMs));
+const overheadSamples = [];
+for (let i = 0; i < 20; i++) overheadSamples.push((await timeRun(["/bin/true"], { timeoutMs: 5000 })).wallMs);
+const spawnOverhead = stats(overheadSamples);
 console.log(`spawn overhead (/bin/true): ${spawnOverhead.median.toFixed(2)} ms median\n`);
 
 const results = {
@@ -191,7 +199,7 @@ for (const bench of benches) {
     let argv;
     let cwd = BUILD_DIR;
     if (runner.mode === "compiled") {
-      const b = build(name, runner, bench);
+      const b = await build(name, runner, bench);
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
       if (!b.ok) {
@@ -206,13 +214,17 @@ for (const bench of benches) {
       cwd = ROOT;
     }
 
-    const check = timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000 });
+    const check = await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
     rec.output = resultLine(check.stdout);
     if (!check.ok) {
       Object.assign(rec, {
-        status: check.timedOut ? "timeout" : "run-failed",
+        status: check.timedOut ? "timeout" : check.memExceeded ? "out-of-memory" : "run-failed",
         exitCode: check.exitCode,
-        error: check.timedOut ? `timeout > ${opts.timeout}s` : firstLines(check.stderr || check.stdout),
+        error: check.timedOut
+          ? `timeout > ${opts.timeout}s`
+          : check.memExceeded
+            ? `exceeded ${opts.memLimitMb} MB RSS (peaked at ${Math.round(check.peakKb / 1024)} MB)`
+            : firstLines(check.stderr || check.stdout),
       });
       console.log(`${rec.status.toUpperCase()}  ${(rec.error ?? "").slice(0, 80)}`);
       flush();
@@ -221,10 +233,10 @@ for (const bench of benches) {
     if (name === "node" || reference === null) reference = rec.output;
     rec.matchesReference = rec.output === reference;
 
-    for (let i = 0; i < opts.warmup; i++) timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000 });
+    for (let i = 0; i < opts.warmup; i++) await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
     const times = [];
     for (let i = 0; i < opts.runs; i++) {
-      const r = timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000 });
+      const r = await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
       if (!r.ok) {
         Object.assign(rec, { status: "unstable", error: firstLines(r.stderr) });
         break;
@@ -235,7 +247,7 @@ for (const bench of benches) {
 
     const rss = [];
     for (let i = 0; i < opts.rssRuns; i++) {
-      const r = rssRun(argv, { cwd, timeoutMs: opts.timeout * 1000 });
+      const r = await rssRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
       if (r.ok) rss.push(r.maxRssKb);
     }
     rec.maxRssKb = rss.length ? Math.max(...rss) : null;
