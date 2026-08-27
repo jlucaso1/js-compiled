@@ -1,0 +1,21 @@
+{
+  "name": "js-compiled",
+  "version": "0.0.0",
+  "description": "Benchmarking JavaScript/TypeScript runtimes against ahead-of-time native compilers",
+  "scripts": {
+    "setup": "scripts/setup.sh",
+    "bench": "node harness/run.mjs",
+    "report": "node harness/report.mjs",
+    "merge": "node harness/merge.mjs"
+  },
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@perryts/perry": "^0.5.1220",
+    "scriptc": "^0.0.35"
+  },
+  "allowScripts": {
+    "scriptc@0.0.35": true
+  },
+  "private": true
+}

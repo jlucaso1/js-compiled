@@ -1,0 +1,135 @@
+name: benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Timed runs per pair
+        default: "5"
+      runners:
+        description: Runners to test
+        default: all
+  schedule:
+    - cron: "0 6 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - benches/**
+      - harness/**
+      - scripts/**
+      - .github/workflows/benchmark.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      benches: ${{ steps.list.outputs.benches }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: echo "benches=$(ls benches | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+
+  bench:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      # One job per bench: every runner in a given row is measured on the same
+      # machine, which is what the comparison actually depends on.
+      matrix:
+        bench: ${{ fromJSON(needs.plan.outputs.benches) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install system tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang
+
+      - run: npm ci
+      - run: ./scripts/setup.sh
+
+      - name: Record toolchain versions
+        run: |
+          node --version
+          bun --version
+          deno --version
+          clang --version | head -1
+          node harness/run.mjs --list
+
+      - name: Run benchmark
+        run: |
+          node harness/run.mjs \
+            --runners='${{ inputs.runners || 'all' }}' \
+            --benches='${{ matrix.bench }}' \
+            --runs='${{ inputs.runs || '5' }}' \
+            --warmup=1 \
+            --timeout=120 \
+            --build-timeout=300 \
+            --out="results/shards/${{ matrix.bench }}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.bench }}
+          path: results/shards/*.json
+          retention-days: 14
+
+  publish:
+    needs: bench
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results/shards
+          pattern: shard-*
+          merge-multiple: true
+
+      - name: Merge shards and render report
+        run: |
+          node harness/merge.mjs results/shards results/latest.json
+          node harness/report.mjs results/latest.json
+          cp results/latest.json site/latest.json
+          cp results/REPORT.md site/REPORT.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: |
+            results/latest.json
+            results/REPORT.md
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

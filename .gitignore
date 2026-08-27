@@ -1,0 +1,6 @@
+node_modules/
+vendor/
+build/
+results/
+site/
+.scriptc/
