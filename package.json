@@ -11,10 +11,10 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "scriptc": "^0.0.35"
+    "scriptc": "^0.0.36"
   },
   "allowScripts": {
-    "scriptc@0.0.35": true
+    "scriptc@0.0.36": true
   },
   "private": true
 }
