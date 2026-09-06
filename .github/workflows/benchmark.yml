@@ -55,7 +55,7 @@ jobs:
           cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
