@@ -39,7 +39,7 @@ file. Everything else uses the latest release.
 
 ```sh
 npm ci
-./scripts/setup.sh                 # vendors Porffor at the latest commit
+./scripts/setup.sh                 # vendors Porffor and builds Static Hermes
 
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the five main candidates, 5 runs each
@@ -50,7 +50,7 @@ node harness/run.mjs --quick       # 1 run, no warmup
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake` and `ninja` (Static Hermes) and GNU `time` (peak RSS).
+Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` (peak RSS).
 
 ## Benchmarks
 
