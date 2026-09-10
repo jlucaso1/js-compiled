@@ -34,5 +34,7 @@ if [ ! -f vendor/hermes/build/bin/shermes ]; then
   cmake --build vendor/hermes/build --target shermes-dep -j"$(nproc)"
 fi
 
-command -v clang >/dev/null || echo "warning: clang not found (scriptc needs it)"
+command -v clang >/dev/null || echo "warning: clang not found (scriptc and shermes need it)"
 command -v cc >/dev/null || echo "warning: cc not found (porffor needs it)"
+command -v cmake >/dev/null || echo "warning: cmake not found (shermes needs it)"
+command -v ninja >/dev/null || echo "warning: ninja not found (shermes needs it)"
