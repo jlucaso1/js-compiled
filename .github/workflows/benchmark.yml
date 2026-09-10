@@ -33,6 +33,7 @@ jobs:
       benches: ${{ steps.list.outputs.benches }}
       hermes_ref: ${{ steps.list.outputs.hermes_ref }}
       porffor_ref: ${{ steps.list.outputs.porffor_ref }}
+      os_image: ${{ steps.list.outputs.os_image }}
     steps:
       - uses: actions/checkout@v4
       - id: list
@@ -40,10 +41,14 @@ jobs:
           echo "benches=$(ls benches | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
           echo "hermes_ref=$(git ls-remote https://github.com/facebook/hermes.git refs/heads/static_h | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "porffor_ref=$(git ls-remote https://github.com/CanadaHonk/porffor.git refs/heads/main | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "os_image=${ImageOS:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
 
   build-tools:
     needs: plan
     runs-on: ubuntu-latest
+    env:
+      HERMES_REF: ${{ needs.plan.outputs.hermes_ref }}
+      PORFFOR_REF: ${{ needs.plan.outputs.porffor_ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,9 +62,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ hashFiles('scripts/setup.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ hashFiles('scripts/setup.sh') }}
           restore-keys: |
-            vendor-${{ runner.os }}-${{ needs.plan.outputs.hermes_ref }}-
+            vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
       - name: Install build tools
         if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == ''
@@ -76,12 +81,16 @@ jobs:
         with:
           name: vendor-bundle
           path: vendor/
+          include-hidden-files: true
           retention-days: 1
 
   bench:
     needs: [plan, build-tools]
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      HERMES_REF: ${{ needs.plan.outputs.hermes_ref }}
+      PORFFOR_REF: ${{ needs.plan.outputs.porffor_ref }}
     strategy:
       fail-fast: false
       # One job per bench: every runner in a given row is measured on the same
