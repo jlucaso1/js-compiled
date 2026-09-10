@@ -22,6 +22,7 @@ Extras, enabled with `--runners=all`:
 |---|---|
 | `scriptc-dynamic` | scriptc with `--dynamic`, embedding quickjs-ng for what will not compile statically |
 | `porffor-js` | Porffor fed the same program with type annotations stripped |
+| `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
 | `deno-compile` | `deno compile` — same idea |
 | `deno` | Deno executing directly |
@@ -30,15 +31,15 @@ Extras, enabled with `--runners=all`:
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
-Porffor is vendored from git at the latest `main` commit (it publishes no
-`package.json` on `main`, and the released npm build is far behind); the exact
-commit is recorded in every result file. Everything else uses the latest release.
+Porffor and Static Hermes are vendored from git at their latest commits (Porffor
+on `main`, Hermes on `static_h`); their exact commits are recorded in every result
+file. Everything else uses the latest release.
 
 ## Usage
 
 ```sh
 npm ci
-./scripts/setup.sh                 # vendors Porffor at the latest commit
+./scripts/setup.sh                 # vendors Porffor and builds Static Hermes
 
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the five main candidates, 5 runs each
@@ -49,7 +50,7 @@ node harness/run.mjs --quick       # 1 run, no warmup
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc), `cc` (Porffor) and GNU `time` (peak RSS).
+Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` (peak RSS).
 
 ## Benchmarks
 

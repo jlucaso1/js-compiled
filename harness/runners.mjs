@@ -4,6 +4,7 @@ import path from "node:path";
 export const ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
 const PORFFOR = path.join(ROOT, "vendor", "porffor", "runtime", "index.js");
+const SHERMES = path.join(ROOT, "vendor", "hermes", "build", "bin", "shermes");
 
 // mode "interpreted": cmd(file) -> argv
 // mode "compiled":    compile(file, out) -> argv
@@ -61,6 +62,16 @@ export const RUNNERS = {
     requires: PORFFOR,
     version: ["node", PORFFOR, "--version"],
     compile: (file, out) => ["node", PORFFOR, "native", "--module", file, "-o", out],
+  },
+
+  shermes: {
+    label: "Static Hermes",
+    tier: "extra",
+    mode: "compiled",
+    source: "stripped-js",
+    requires: SHERMES,
+    version: [SHERMES, "-version"],
+    compile: (file, out) => [SHERMES, "-O", file, "-o", out],
   },
 
   "bun-compile": {

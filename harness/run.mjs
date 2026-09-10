@@ -101,7 +101,9 @@ const limitKb = opts.memLimitMb * 1024;
 
 async function version(name) {
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
-  return clean(r.stdout + r.stderr).trim().split("\n")[0]?.trim() || "unknown";
+  const lines = clean(r.stdout + r.stderr).trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const matched = lines.find((l) => l.includes("Static Hermes"));
+  return matched || lines[0] || "unknown";
 }
 
 // Type annotations have no runtime meaning; stripping them only removes syntax
@@ -151,9 +153,17 @@ if (existsSync(path.join(porfforDir, ".git"))) {
   if (r.ok) porfforCommit = r.stdout.trim();
 }
 
+const hermesDir = path.join(ROOT, "vendor", "hermes");
+let hermesCommit = null;
+if (existsSync(path.join(hermesDir, ".git"))) {
+  const r = await timeRun(["git", "-C", hermesDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
+  if (r.ok) hermesCommit = r.stdout.trim();
+}
+
 console.log("=".repeat(72));
 for (const n of active) console.log(`  ${n.padEnd(17)} ${versions[n]}`);
 if (porfforCommit) console.log(`  ${"porffor commit".padEnd(17)} ${porfforCommit}`);
+if (hermesCommit) console.log(`  ${"shermes commit".padEnd(17)} ${hermesCommit}`);
 console.log(`  benches ${benches.length} · runs ${opts.runs} (warmup ${opts.warmup}) · rss runs ${opts.rssRuns}`);
 console.log("=".repeat(72));
 
@@ -174,6 +184,7 @@ const results = {
     commit: process.env.GITHUB_SHA ?? null,
     versions,
     porfforCommit,
+    hermesCommit,
     opts: { runs: opts.runs, warmup: opts.warmup, rssRuns: opts.rssRuns, timeout: opts.timeout },
     spawnOverheadMs: spawnOverhead,
   },

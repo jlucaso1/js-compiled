@@ -49,6 +49,7 @@ md.push(`- Spawn overhead (\`/bin/true\`): ${data.meta.spawnOverheadMs.median.to
 md.push("### Versions\n");
 md.push(mdTable([["runner", "version"], ...runners.map((r) => [r, benches.map((b) => rec(b, r)?.version).find(Boolean) ?? "-"])]));
 if (data.meta.porfforCommit) md.push(`\nPorffor commit: \`${data.meta.porfforCommit}\``);
+if (data.meta.hermesCommit) md.push(`\nStatic Hermes commit: \`${data.meta.hermesCommit}\``);
 
 md.push("\n## Coverage\n");
 md.push(mdTable([
