@@ -101,7 +101,9 @@ const limitKb = opts.memLimitMb * 1024;
 
 async function version(name) {
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
-  return clean(r.stdout + r.stderr).trim().split("\n")[0]?.trim() || "unknown";
+  const lines = clean(r.stdout + r.stderr).trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const matched = lines.find((l) => l.includes("Static Hermes"));
+  return matched || lines[0] || "unknown";
 }
 
 // Type annotations have no runtime meaning; stripping them only removes syntax

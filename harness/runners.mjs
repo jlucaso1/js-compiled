@@ -70,7 +70,7 @@ export const RUNNERS = {
     mode: "compiled",
     source: "stripped-js",
     requires: SHERMES,
-    version: ["bash", "-c", `${SHERMES} -version 2>/dev/null | grep -i "Static Hermes" || echo "Static Hermes"`],
+    version: [SHERMES, "-version"],
     compile: (file, out) => [SHERMES, "-O", file, "-o", out],
   },
 
