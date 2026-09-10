@@ -14,5 +14,25 @@ else
 fi
 echo "porffor $(git -C vendor/porffor rev-parse --short HEAD)"
 
+# Static Hermes (branch static_h)
+HERMES_REF="${HERMES_REF:-static_h}"
+if [ -d vendor/hermes/.git ]; then
+  git -C vendor/hermes fetch --depth 1 origin "$HERMES_REF"
+  git -C vendor/hermes checkout -q FETCH_HEAD
+else
+  mkdir -p vendor
+  git clone --depth 1 --branch "$HERMES_REF" https://github.com/facebook/hermes.git vendor/hermes
+fi
+echo "hermes $(git -C vendor/hermes rev-parse --short HEAD)"
+
+if [ ! -f vendor/hermes/build/bin/shermes ]; then
+  echo "Building Static Hermes..."
+  cmake -S vendor/hermes -B vendor/hermes/build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++
+  cmake --build vendor/hermes/build --target shermes-dep -j"$(nproc)"
+fi
+
 command -v clang >/dev/null || echo "warning: clang not found (scriptc needs it)"
 command -v cc >/dev/null || echo "warning: cc not found (porffor needs it)"
