@@ -152,12 +152,20 @@ if (existsSync(path.join(porfforDir, ".git"))) {
   const r = await timeRun(["git", "-C", porfforDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
   if (r.ok) porfforCommit = r.stdout.trim();
 }
+if (!porfforCommit && existsSync(path.join(porfforDir, ".porffor_commit"))) {
+  porfforCommit = readFileSync(path.join(porfforDir, ".porffor_commit"), "utf8").trim();
+}
 
 const hermesDir = path.join(ROOT, "vendor", "hermes");
 let hermesCommit = null;
 if (existsSync(path.join(hermesDir, ".git"))) {
   const r = await timeRun(["git", "-C", hermesDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
   if (r.ok) hermesCommit = r.stdout.trim();
+}
+if (!hermesCommit && existsSync(path.join(hermesDir, "build", ".built_commit"))) {
+  hermesCommit = readFileSync(path.join(hermesDir, "build", ".built_commit"), "utf8").trim();
+} else if (!hermesCommit && existsSync(path.join(hermesDir, ".hermes_commit"))) {
+  hermesCommit = readFileSync(path.join(hermesDir, ".hermes_commit"), "utf8").trim();
 }
 
 console.log("=".repeat(72));

@@ -77,12 +77,14 @@ jobs:
           npm ci
           ./scripts/setup.sh
 
+      - name: Package vendored toolchains
+        run: tar -czf vendor-bundle.tar.gz vendor/
+
       - name: Upload vendor artifact for shards
         uses: actions/upload-artifact@v4
         with:
           name: vendor-bundle
-          path: vendor/
-          include-hidden-files: true
+          path: vendor-bundle.tar.gz
           retention-days: 1
 
   bench:
@@ -119,10 +121,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vendor-bundle
-          path: vendor/
+          path: .
 
-      - name: Fix permissions
+      - name: Extract vendored toolchains
         run: |
+          if [ -f vendor-bundle.tar.gz ]; then
+            tar -xzf vendor-bundle.tar.gz
+            rm -f vendor-bundle.tar.gz
+          elif [ -f vendor-bundle/vendor-bundle.tar.gz ]; then
+            tar -xzf vendor-bundle/vendor-bundle.tar.gz
+            rm -rf vendor-bundle
+          fi
           chmod -R +x vendor/hermes/build/bin/ 2>/dev/null || true
           chmod -R +x vendor/hermes/build/lib/ 2>/dev/null || true
 
