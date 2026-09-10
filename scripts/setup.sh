@@ -6,28 +6,46 @@ cd "$(dirname "$0")/.."
 # Porffor has no package.json on main, so it is vendored from git at a pinned commit.
 PORFFOR_REF="${PORFFOR_REF:-1f4ae4ae3e0a5f0a93b3bc084359e1a3a23391fd}"
 if [ -d vendor/porffor/.git ]; then
-  git -C vendor/porffor fetch --depth 1 origin "$PORFFOR_REF"
-  git -C vendor/porffor checkout -q FETCH_HEAD
+  CURRENT_PORFFOR="$(git -C vendor/porffor rev-parse HEAD 2>/dev/null || true)"
+  if [ "$CURRENT_PORFFOR" != "$PORFFOR_REF" ]; then
+    git -C vendor/porffor checkout -q "$PORFFOR_REF" 2>/dev/null || {
+      git -C vendor/porffor fetch --depth 1 origin refs/heads/main
+      git -C vendor/porffor checkout -q "$PORFFOR_REF" 2>/dev/null || git -C vendor/porffor checkout -q FETCH_HEAD
+    }
+  fi
 else
   mkdir -p vendor/porffor
-  git -C vendor/porffor init -q
-  git -C vendor/porffor remote add origin https://github.com/CanadaHonk/porffor.git
-  git -C vendor/porffor fetch --depth 1 origin "$PORFFOR_REF"
-  git -C vendor/porffor checkout -q FETCH_HEAD
+  git clone --depth 1 https://github.com/CanadaHonk/porffor.git vendor/porffor
+  if [ "$PORFFOR_REF" != "main" ]; then
+    git -C vendor/porffor checkout -q "$PORFFOR_REF" 2>/dev/null || {
+      git -C vendor/porffor fetch --depth 1 origin "$PORFFOR_REF" 2>/dev/null || git -C vendor/porffor fetch --depth 1 origin refs/heads/main
+      git -C vendor/porffor checkout -q "$PORFFOR_REF" 2>/dev/null || git -C vendor/porffor checkout -q FETCH_HEAD
+    }
+  fi
 fi
 echo "porffor $(git -C vendor/porffor rev-parse --short HEAD)"
 
 # Static Hermes (branch static_h)
 HERMES_REF="${HERMES_REF:-static_h}"
 if [ -d vendor/hermes/.git ]; then
-  git -C vendor/hermes fetch --depth 1 origin "$HERMES_REF"
-  git -C vendor/hermes checkout -q FETCH_HEAD
+  CURRENT_HERMES="$(git -C vendor/hermes rev-parse HEAD 2>/dev/null || true)"
+  if [ "$CURRENT_HERMES" != "$HERMES_REF" ]; then
+    git -C vendor/hermes checkout -q "$HERMES_REF" 2>/dev/null || {
+      git -C vendor/hermes fetch --depth 1 origin refs/heads/static_h
+      git -C vendor/hermes checkout -q "$HERMES_REF" 2>/dev/null || git -C vendor/hermes checkout -q FETCH_HEAD
+    }
+  fi
 else
   mkdir -p vendor/hermes
-  git -C vendor/hermes init -q
-  git -C vendor/hermes remote add origin https://github.com/facebook/hermes.git
-  git -C vendor/hermes fetch --depth 1 origin "$HERMES_REF"
-  git -C vendor/hermes checkout -q FETCH_HEAD
+  git clone --depth 1 --branch "$HERMES_REF" https://github.com/facebook/hermes.git vendor/hermes 2>/dev/null || {
+    git clone --depth 1 --branch static_h https://github.com/facebook/hermes.git vendor/hermes
+    if [ "$HERMES_REF" != "static_h" ]; then
+      git -C vendor/hermes checkout -q "$HERMES_REF" 2>/dev/null || {
+        git -C vendor/hermes fetch --depth 1 origin "$HERMES_REF" 2>/dev/null || git -C vendor/hermes fetch --depth 1 origin refs/heads/static_h
+        git -C vendor/hermes checkout -q "$HERMES_REF" 2>/dev/null || git -C vendor/hermes checkout -q FETCH_HEAD
+      }
+    fi
+  }
 fi
 HERMES_COMMIT="$(git -C vendor/hermes rev-parse HEAD)"
 echo "hermes ${HERMES_COMMIT:0:7}"
