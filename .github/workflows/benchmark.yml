@@ -40,7 +40,8 @@ jobs:
         run: |
           echo "benches=$(ls benches | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
           echo "hermes_ref=$(git ls-remote https://github.com/facebook/hermes.git refs/heads/static_h | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-          echo "porffor_ref=$(git ls-remote https://github.com/CanadaHonk/porffor.git refs/heads/main | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          porffor_ref=$(grep 'PORFFOR_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
+          echo "porffor_ref=${porffor_ref:-1f4ae4ae3e0a5f0a93b3bc084359e1a3a23391fd}" >> "$GITHUB_OUTPUT"
           echo "os_image=${ImageOS:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
 
   build-tools:
