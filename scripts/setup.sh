@@ -3,8 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Porffor has no package.json on main, so it is vendored from git at the latest commit.
-PORFFOR_REF="${PORFFOR_REF:-main}"
+# Porffor has no package.json on main, so it is vendored from git at a pinned commit.
+PORFFOR_REF="${PORFFOR_REF:-1f4ae4ae3e0a5f0a93b3bc084359e1a3a23391fd}"
 if [ -d vendor/porffor/.git ]; then
   git -C vendor/porffor fetch --depth 1 origin "$PORFFOR_REF"
   git -C vendor/porffor checkout -q FETCH_HEAD
