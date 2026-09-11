@@ -15,6 +15,7 @@ Results are produced entirely by GitHub Actions and published to GitHub Pages.
 | `bun` | executes directly | Bun (JavaScriptCore, JIT) |
 | `scriptc` | **compiles** | [vercel-labs/scriptc](https://github.com/vercel-labs/scriptc) — TS → IR → LLVM → native, no JS engine |
 | `porffor` | **compiles** | [CanadaHonk/porffor](https://github.com/CanadaHonk/porffor) — AOT JS/TS → C → native |
+| `perry` | **compiles** | [PerryTS/perry](https://github.com/PerryTS/perry) — TypeScript → native, pinned to 0.5.1520 |
 
 Extras, enabled with `--runners=all`:
 
@@ -33,7 +34,7 @@ column against the real AOT output.
 
 Porffor and Static Hermes are vendored from git at their latest commits (Porffor
 on `main`, Hermes on `static_h`); their exact commits are recorded in every result
-file. Everything else uses the latest release.
+file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
 
@@ -46,11 +47,18 @@ node harness/run.mjs               # the five main candidates, 5 runs each
 node harness/run.mjs --runners=all
 node harness/run.mjs --benches=10-fib --runs=10
 node harness/run.mjs --quick       # 1 run, no warmup
+node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry release
 
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` (peak RSS).
+Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+
+Perry uses the exact release in `package-lock.json`. For a local compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
+
+```bash
+PERRY_BIN=/absolute/path/to/perry node harness/run.mjs --runners=node,perry --quick
+```
 
 ## Benchmarks
 
@@ -89,11 +97,12 @@ does not dominate, low enough for a JIT-less AOT binary to finish.
 
 ## Methodology
 
-- **Time** is `hrtime` around `spawnSync`, with no wrapper: GNU `time` resolves to
+- **Time** is `hrtime` around `spawn`, with no wrapper: GNU `time` resolves to
   10 ms, useless for a binary that runs in 1 ms. The harness measures and reports
   its own spawn overhead (`/bin/true`) so it can be discounted on startup benches.
-- **Memory** is peak RSS of the process and its children, from separate runs under
-  `/usr/bin/time -f %M`.
+- **Memory** is peak RSS from separate runs under `/usr/bin/time -f %M` on Linux
+  or `/usr/bin/time -l` on macOS, normalized to KiB in result JSON. The watchdog
+  separately monitors the sum of RSS across the workload's process tree.
 - **Correctness** compares each runner's `RESULT` line against Node's. A fast
   runner that answers wrong is reported as a mismatch, not as a win.
 - **Warmup** warms the page cache, not the JIT — every run is a fresh process, so
@@ -121,7 +130,10 @@ HTTP throughput, startup under I/O load, container image size, energy use.
   every run is capped by an RSS watchdog (`--mem-limit-mb`, 4096 by default) and
   reported as `out-of-memory`. The harness also raises its own `oom_score_adj`
   (children inherit it) and writes the result file after every pair, so a killed
-  job still leaves a usable shard.
+  job still leaves a usable shard. Timeout and memory limits kill the entire
+  process group, including children of compiler and memory-measurement wrappers.
+  Limits apply to builds, correctness checks, warmups, timing, and RSS runs;
+  failures retain their phase and reason in the result JSON.
 
 ## Layout
 

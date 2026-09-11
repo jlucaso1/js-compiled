@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "description": "Benchmarking JavaScript/TypeScript runtimes against ahead-of-time native compilers",
   "scripts": {
+    "test": "node --test harness/*.test.mjs",
     "setup": "scripts/setup.sh",
     "bench": "node harness/run.mjs",
     "report": "node harness/report.mjs",
@@ -11,6 +12,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@perryts/perry": "0.5.1520",
     "scriptc": "^0.0.36"
   },
   "allowScripts": {

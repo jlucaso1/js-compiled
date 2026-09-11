@@ -15,12 +15,13 @@ const benches = Object.keys(data.benches);
 const runners = [...new Set(benches.flatMap((b) => Object.keys(data.benches[b].runners)))];
 const rec = (b, r) => data.benches[b].runners[r];
 const shortName = (b) => b.replace(/\.(ts|js)$/, "");
+const correct = (x) => x?.status === "ok" && x.matchesReference !== false;
 
 const METRICS = [
-  { key: "time", title: "Execution time", unit: "ms", note: "median wall clock, lower is better", get: (x) => (x?.status === "ok" ? x.time?.median : null), fmt: (v) => (v < 10 ? v.toFixed(2) : Math.round(v).toLocaleString("en-US")) },
-  { key: "memory", title: "Peak memory", unit: "MB", note: "max RSS, lower is better", get: (x) => (x?.status === "ok" && x.maxRssKb ? x.maxRssKb / 1024 : null), fmt: (v) => (v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString("en-US")) },
+  { key: "time", title: "Execution time", unit: "ms", note: "median wall clock, lower is better", get: (x) => (correct(x) ? x.time?.median : null), fmt: (v) => (v < 10 ? v.toFixed(2) : Math.round(v).toLocaleString("en-US")) },
+  { key: "memory", title: "Peak memory", unit: "MB", note: "max RSS, lower is better", get: (x) => (correct(x) && x.maxRssKb ? x.maxRssKb / 1024 : null), fmt: (v) => (v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString("en-US")) },
   { key: "binary", title: "Binary size", unit: "MB", note: "compiled runners only, lower is better", get: (x) => (x?.binBytes ? x.binBytes / 1024 / 1024 : null), fmt: (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1)) },
-  { key: "build", title: "Compile time", unit: "s", note: "compiled runners only, lower is better", get: (x) => (x?.buildMs != null && x.status !== "build-failed" ? x.buildMs / 1000 : null), fmt: (v) => v.toFixed(2) },
+  { key: "build", title: "Compile time", unit: "s", note: "compiled runners only, lower is better", get: (x) => (x?.buildMs != null && x.status !== "build-failed" && x.phase !== "build" ? x.buildMs / 1000 : null), fmt: (v) => v.toFixed(2) },
 ];
 
 const statusOf = (x) => {
@@ -92,7 +93,7 @@ const failures = benches.flatMap((b) => runners.flatMap((r) => {
   const x = rec(b, r);
   if (!x) return [];
   if (x.status !== "ok") return [[shortName(b), r, x.status, (x.error ?? "").slice(0, 200)]];
-  if (x.matchesReference === false) return [[shortName(b), r, "output differs", `expected ${rec(b, "node")?.output}, got ${x.output}`]];
+  if (x.matchesReference === false) return [[shortName(b), r, "output differs", `expected ${data.benches[b].reference?.output ?? rec(b, "node")?.output}, got ${x.output}`]];
   return [];
 }));
 if (failures.length) {
@@ -177,7 +178,7 @@ a{color:var(--bar)}
 footer{color:var(--muted);font-size:.8rem;margin-top:2rem}
 </style></head><body><main>
 <h1>JavaScript/TypeScript to native binary</h1>
-<p class="sub">Runtimes that execute directly (Node, Bun, Deno) against compilers that emit a native binary (scriptc, Porffor), measured on execution time, peak memory, binary size, compile time and coverage.</p>
+<p class="sub">Runtimes that execute directly (Node, Bun, Deno) against compilers that emit a native binary (scriptc, Porffor, Perry), measured on execution time, peak memory, binary size, compile time and coverage.</p>
 
 <section><h2>Run</h2>
 <dl class="env">
