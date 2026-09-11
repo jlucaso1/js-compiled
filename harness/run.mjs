@@ -190,10 +190,23 @@ if (!hermesCommit && existsSync(path.join(hermesDir, "build", ".built_commit")))
   hermesCommit = readFileSync(path.join(hermesDir, ".hermes_commit"), "utf8").trim();
 }
 
+const quickjsDir = path.join(ROOT, "vendor", "quickjs");
+let quickjsCommit = null;
+if (existsSync(path.join(quickjsDir, ".git"))) {
+  const r = await timeRun(["git", "-C", quickjsDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
+  if (r.ok) quickjsCommit = r.stdout.trim();
+}
+if (!quickjsCommit && existsSync(path.join(quickjsDir, "build", ".built_commit"))) {
+  quickjsCommit = readFileSync(path.join(quickjsDir, "build", ".built_commit"), "utf8").trim();
+} else if (!quickjsCommit && existsSync(path.join(quickjsDir, ".quickjs_commit"))) {
+  quickjsCommit = readFileSync(path.join(quickjsDir, ".quickjs_commit"), "utf8").trim();
+}
+
 console.log("=".repeat(72));
 for (const n of active) console.log(`  ${n.padEnd(17)} ${versions[n]}`);
 if (porfforCommit) console.log(`  ${"porffor commit".padEnd(17)} ${porfforCommit}`);
 if (hermesCommit) console.log(`  ${"shermes commit".padEnd(17)} ${hermesCommit}`);
+if (quickjsCommit) console.log(`  ${"quickjs commit".padEnd(17)} ${quickjsCommit}`);
 console.log(`  benches ${benches.length} · runs ${opts.runs} (warmup ${opts.warmup}) · rss runs ${opts.rssRuns}`);
 console.log("=".repeat(72));
 
@@ -216,6 +229,7 @@ const results = {
     referenceVersion,
     porfforCommit,
     hermesCommit,
+    quickjsCommit,
     opts: { runs: opts.runs, warmup: opts.warmup, rssRuns: opts.rssRuns, timeout: opts.timeout, buildTimeout: opts.buildTimeout, memLimitMb: opts.memLimitMb },
     spawnOverheadMs: spawnOverhead,
   },

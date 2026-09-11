@@ -35,6 +35,7 @@ jobs:
       benches: ${{ steps.list.outputs.benches }}
       hermes_ref: ${{ steps.list.outputs.hermes_ref }}
       porffor_ref: ${{ steps.list.outputs.porffor_ref }}
+      quickjs_ref: ${{ steps.list.outputs.quickjs_ref }}
       os_image: ${{ steps.list.outputs.os_image }}
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,8 @@ jobs:
           echo "hermes_ref=$(git ls-remote https://github.com/facebook/hermes.git refs/heads/static_h | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           porffor_ref=$(grep 'PORFFOR_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
           echo "porffor_ref=${porffor_ref:-1f4ae4ae3e0a5f0a93b3bc084359e1a3a23391fd}" >> "$GITHUB_OUTPUT"
+          quickjs_ref=$(grep 'QUICKJS_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
+          echo "quickjs_ref=${quickjs_ref:-v0.16.2}" >> "$GITHUB_OUTPUT"
           echo "os_image=${ImageOS:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
 
   build-tools:
@@ -52,6 +55,7 @@ jobs:
     env:
       HERMES_REF: ${{ needs.plan.outputs.hermes_ref }}
       PORFFOR_REF: ${{ needs.plan.outputs.porffor_ref }}
+      QUICKJS_REF: ${{ needs.plan.outputs.quickjs_ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -65,16 +69,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ hashFiles('scripts/setup.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
       - name: Install build tools
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == ''
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == ''
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang ninja-build libicu-dev
 
       - name: Setup vendored toolchains
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == ''
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == ''
         run: |
           npm ci
           ./scripts/setup.sh
@@ -96,6 +100,7 @@ jobs:
     env:
       HERMES_REF: ${{ needs.plan.outputs.hermes_ref }}
       PORFFOR_REF: ${{ needs.plan.outputs.porffor_ref }}
+      QUICKJS_REF: ${{ needs.plan.outputs.quickjs_ref }}
     strategy:
       fail-fast: false
       # One job per bench: every runner in a given row is measured on the same
@@ -136,6 +141,7 @@ jobs:
           fi
           chmod -R +x vendor/hermes/build/bin/ 2>/dev/null || true
           chmod -R +x vendor/hermes/build/lib/ 2>/dev/null || true
+          chmod -R +x vendor/quickjs/build/ 2>/dev/null || true
 
       - run: npm ci
       - run: ./scripts/setup.sh
@@ -148,6 +154,7 @@ jobs:
           deno --version
           clang --version | head -1
           vendor/hermes/build/bin/shermes -version 2>/dev/null | grep -i "Static Hermes" || true
+          vendor/quickjs/build/qjs -v 2>/dev/null || qjs -v 2>/dev/null || true
           node harness/run.mjs --list
 
       - name: Run benchmark

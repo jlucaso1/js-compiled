@@ -79,5 +79,49 @@ else
   fi
 fi
 
+# QuickJS-ng
+QUICKJS_REF="${QUICKJS_REF:-v0.16.2}"
+QUICKJS_COMMIT_FILE="vendor/quickjs/.quickjs_commit"
+BUILT_QUICKJS_COMMIT_FILE="vendor/quickjs/build/.built_commit"
+
+LAST_BUILT_QUICKJS_COMMIT=""
+[ -f "$BUILT_QUICKJS_COMMIT_FILE" ] && LAST_BUILT_QUICKJS_COMMIT="$(cat "$BUILT_QUICKJS_COMMIT_FILE" 2>/dev/null || true)"
+
+CURRENT_QUICKJS=""
+if [ -d vendor/quickjs/.git ]; then
+  CURRENT_QUICKJS="$(git -C vendor/quickjs rev-parse HEAD 2>/dev/null || true)"
+elif [ -f "$QUICKJS_COMMIT_FILE" ]; then
+  CURRENT_QUICKJS="$(cat "$QUICKJS_COMMIT_FILE" 2>/dev/null || true)"
+fi
+
+if [ -f vendor/quickjs/build/qjs ] && [ -n "$LAST_BUILT_QUICKJS_COMMIT" ] && { [ "$LAST_BUILT_QUICKJS_COMMIT" = "$QUICKJS_REF" ] || [ "$CURRENT_QUICKJS" = "$LAST_BUILT_QUICKJS_COMMIT" ]; }; then
+  echo "$LAST_BUILT_QUICKJS_COMMIT" > "$QUICKJS_COMMIT_FILE"
+  echo "quickjs ${LAST_BUILT_QUICKJS_COMMIT:0:7}"
+else
+  if [ -d vendor/quickjs/.git ]; then
+    git -C vendor/quickjs fetch --depth 1 origin "$QUICKJS_REF"
+    git -C vendor/quickjs checkout -q FETCH_HEAD
+  else
+    mkdir -p vendor/quickjs
+    git -C vendor/quickjs init -q
+    git -C vendor/quickjs remote add origin https://github.com/quickjs-ng/quickjs.git 2>/dev/null || git -C vendor/quickjs remote set-url origin https://github.com/quickjs-ng/quickjs.git
+    git -C vendor/quickjs fetch --depth 1 origin "$QUICKJS_REF"
+    git -C vendor/quickjs checkout -q FETCH_HEAD
+  fi
+  QUICKJS_COMMIT="$(git -C vendor/quickjs rev-parse HEAD)"
+  echo "$QUICKJS_COMMIT" > "$QUICKJS_COMMIT_FILE"
+  echo "quickjs ${QUICKJS_COMMIT:0:7}"
+
+  if [ ! -f vendor/quickjs/build/qjs ] || [ "$LAST_BUILT_QUICKJS_COMMIT" != "$QUICKJS_COMMIT" ]; then
+    command -v cmake >/dev/null || { echo "error: cmake not found (quickjs build needs it)" >&2; exit 1; }
+    command -v ninja >/dev/null || { echo "error: ninja not found (quickjs build needs it)" >&2; exit 1; }
+    echo "Building QuickJS-ng (${QUICKJS_COMMIT:0:7})..."
+    cmake -S vendor/quickjs -B vendor/quickjs/build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release
+    cmake --build vendor/quickjs/build --target qjs -j"$(nproc)"
+    echo "$QUICKJS_COMMIT" > "$BUILT_QUICKJS_COMMIT_FILE"
+  fi
+fi
+
 command -v clang >/dev/null || echo "warning: clang not found (scriptc and shermes need it)"
-command -v cc >/dev/null || echo "warning: cc not found (porffor needs it)"
+command -v cc >/dev/null || echo "warning: cc not found (porffor and quickjs need it)"

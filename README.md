@@ -24,6 +24,7 @@ Extras, enabled with `--runners=all`:
 | `scriptc-dynamic` | scriptc with `--dynamic`, embedding quickjs-ng for what will not compile statically |
 | `porffor-js` | Porffor fed the same program with type annotations stripped |
 | `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
+| `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
 | `deno-compile` | `deno compile` — same idea |
 | `deno` | Deno executing directly |
@@ -32,15 +33,15 @@ Extras, enabled with `--runners=all`:
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
-Porffor and Static Hermes are vendored from git at their latest commits (Porffor
-on `main`, Hermes on `static_h`); their exact commits are recorded in every result
+Porffor, Static Hermes, and QuickJS-ng are vendored from git at their latest commits / pinned releases (Porffor
+on `main`, Hermes on `static_h`, QuickJS-ng on `v0.16.2`); their exact commits are recorded in every result
 file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
 
 ```sh
 npm ci
-./scripts/setup.sh                 # vendors Porffor and builds Static Hermes
+./scripts/setup.sh                 # vendors Porffor and builds Static Hermes and QuickJS-ng
 
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the five main candidates, 5 runs each
@@ -52,7 +53,7 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
 Perry uses the exact release in `package-lock.json`. For a local compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
 
