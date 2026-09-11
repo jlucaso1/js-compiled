@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "startedAt": "2026-09-11T03:50:38.652Z",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 10,
+    "cpuModel": "Apple M1 Max",
+    "totalMemGb": 64,
+    "ci": false,
+    "commit": null,
+    "versions": {
+      "node": "v26.5.1",
+      "perry": "perry 0.5.1220"
+    },
+    "referenceVersion": "v26.5.1",
+    "porfforCommit": null,
+    "hermesCommit": null,
+    "opts": {
+      "runs": 1,
+      "warmup": 0,
+      "rssRuns": 1,
+      "timeout": 30,
+      "buildTimeout": 300,
+      "memLimitMb": 4096
+    },
+    "spawnOverheadMs": {
+      "min": 0.149459,
+      "max": 0.479916,
+      "mean": 0.25906045,
+      "median": 0.226792,
+      "stddev": 0.10021636066687493,
+      "runs": 20
+    },
+    "finishedAt": "2026-09-11T03:50:53.348Z"
+  },
+  "benches": {
+    "23-binary-trees.ts": {
+      "file": "23-binary-trees.ts",
+      "sourceBytes": 967,
+      "runners": {
+        "node": {
+          "mode": "interpreted",
+          "label": "Node.js",
+          "version": "v26.5.1",
+          "status": "ok",
+          "output": "136664414",
+          "checkMs": 1652.641167,
+          "checkPeakRssKb": 275040,
+          "matchesReference": true,
+          "time": {
+            "min": 1627.503,
+            "max": 1627.503,
+            "mean": 1627.503,
+            "median": 1627.503,
+            "stddev": 0,
+            "runs": 1
+          },
+          "maxRssKb": 277792
+        },
+        "perry": {
+          "mode": "compiled",
+          "label": "Perry",
+          "version": "perry 0.5.1220",
+          "status": "out-of-memory",
+          "buildMs": 2060.803666,
+          "binBytes": 7940944,
+          "output": null,
+          "checkMs": 7782.621667,
+          "checkPeakRssKb": 4396192,
+          "phase": "check",
+          "exitCode": null,
+          "signal": "SIGKILL",
+          "peakKb": 4396192,
+          "error": "exceeded 4096 MB RSS (peaked at 4293 MB)"
+        }
+      },
+      "reference": {
+        "version": "v26.5.1",
+        "output": "136664414"
+      }
+    }
+  }
+}

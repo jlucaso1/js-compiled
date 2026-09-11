@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "startedAt": "2026-09-11T03:51:06.131Z",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 10,
+    "cpuModel": "Apple M1 Max",
+    "totalMemGb": 64,
+    "ci": false,
+    "commit": null,
+    "versions": {
+      "node": "v26.5.1",
+      "perry": "perry 0.5.1520"
+    },
+    "referenceVersion": "v26.5.1",
+    "porfforCommit": null,
+    "hermesCommit": null,
+    "opts": {
+      "runs": 5,
+      "warmup": 1,
+      "rssRuns": 2,
+      "timeout": 120,
+      "buildTimeout": 300,
+      "memLimitMb": 4096
+    },
+    "spawnOverheadMs": {
+      "min": 0.164416,
+      "max": 0.587291,
+      "mean": 0.27271455,
+      "median": 0.2521665,
+      "stddev": 0.09672671900417773,
+      "runs": 20
+    },
+    "finishedAt": "2026-09-11T03:52:26.207Z"
+  },
+  "benches": {
+    "23-binary-trees.ts": {
+      "file": "23-binary-trees.ts",
+      "sourceBytes": 967,
+      "runners": {
+        "node": {
+          "mode": "interpreted",
+          "label": "Node.js",
+          "version": "v26.5.1",
+          "status": "ok",
+          "output": "136664414",
+          "checkMs": 1358.583958,
+          "checkPeakRssKb": 275760,
+          "matchesReference": true,
+          "time": {
+            "min": 1240.583625,
+            "max": 1514.470542,
+            "mean": 1344.4648336,
+            "median": 1347.386875,
+            "stddev": 111.45775556324513,
+            "runs": 5
+          },
+          "maxRssKb": 277712
+        },
+        "perry": {
+          "mode": "compiled",
+          "label": "Perry",
+          "version": "perry 0.5.1520",
+          "status": "ok",
+          "buildMs": 1055.628083,
+          "binBytes": 14933760,
+          "output": "136664414",
+          "checkMs": 3165.662167,
+          "checkPeakRssKb": 207472,
+          "matchesReference": true,
+          "time": {
+            "min": 2475.20225,
+            "max": 3592.267333,
+            "mean": 2871.2092999999995,
+            "median": 2726.185167,
+            "stddev": 473.28503377128726,
+            "runs": 5
+          },
+          "maxRssKb": 208096
+        }
+      },
+      "reference": {
+        "version": "v26.5.1",
+        "output": "136664414"
+      }
+    },
+    "31-json.ts": {
+      "file": "31-json.ts",
+      "sourceBytes": 690,
+      "runners": {
+        "node": {
+          "mode": "interpreted",
+          "label": "Node.js",
+          "version": "v26.5.1",
+          "status": "ok",
+          "output": "2204940400",
+          "checkMs": 1002.450291,
+          "checkPeakRssKb": 241472,
+          "matchesReference": true,
+          "time": {
+            "min": 951.766459,
+            "max": 1159.653875,
+            "mean": 1043.2042834,
+            "median": 993.7185,
+            "stddev": 106.11617425964113,
+            "runs": 5
+          },
+          "maxRssKb": 244016
+        },
+        "perry": {
+          "mode": "compiled",
+          "label": "Perry",
+          "version": "perry 0.5.1520",
+          "status": "ok",
+          "buildMs": 1852.594375,
+          "binBytes": 14917208,
+          "output": "2204940400",
+          "checkMs": 3574.1935,
+          "checkPeakRssKb": 975744,
+          "matchesReference": true,
+          "time": {
+            "min": 3087.34175,
+            "max": 4098.983709,
+            "mean": 3330.18495,
+            "median": 3178.35275,
+            "stddev": 432.0252564101431,
+            "runs": 5
+          },
+          "maxRssKb": 975744
+        }
+      },
+      "reference": {
+        "version": "v26.5.1",
+        "output": "2204940400"
+      }
+    }
+  }
+}
