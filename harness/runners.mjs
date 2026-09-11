@@ -5,6 +5,18 @@ export const ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
 const PORFFOR = path.join(ROOT, "vendor", "porffor", "runtime", "index.js");
 const SHERMES = path.join(ROOT, "vendor", "hermes", "build", "bin", "shermes");
+const VENDOR_QJS = path.join(ROOT, "vendor", "quickjs", "build", "qjs");
+
+function resolveQjs() {
+  if (existsSync(VENDOR_QJS)) return VENDOR_QJS;
+  for (const p of (process.env.PATH || "").split(path.delimiter)) {
+    const candidate = path.join(p, "qjs");
+    if (existsSync(candidate)) return candidate;
+  }
+  return VENDOR_QJS;
+}
+
+const QJS = resolveQjs();
 
 // mode "interpreted": cmd(file) -> argv
 // mode "compiled":    compile(file, out) -> argv
@@ -72,6 +84,16 @@ export const RUNNERS = {
     requires: SHERMES,
     version: [SHERMES, "-version"],
     compile: (file, out) => [SHERMES, "-O", file, "-o", out],
+  },
+
+  "quickjs-ng": {
+    label: "QuickJS-ng",
+    tier: "extra",
+    mode: "compiled",
+    source: "stripped-js",
+    requires: QJS,
+    version: [QJS, "-v"],
+    compile: (file, out) => [QJS, "-c", file, "-o", out],
   },
 
   "bun-compile": {
