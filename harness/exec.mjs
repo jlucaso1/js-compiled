@@ -72,6 +72,11 @@ function run(argv, { cwd, timeoutMs = 300000, memLimitKb = 0 } = {}) {
     const killTree = () => {
       if (PROCESS_GROUPS && child.pid) {
         try { process.kill(-child.pid, "SIGKILL"); } catch {}
+      } else if (child.pid) {
+        // Windows has no POSIX process groups; /T includes descendants.
+        spawnSync("taskkill.exe", ["/F", "/T", "/PID", String(child.pid)], {
+          stdio: "ignore", windowsHide: true, timeout: 5000,
+        });
       } else {
         child.kill("SIGKILL");
       }
@@ -122,7 +127,9 @@ export const timeRun = run;
 export async function rssRun(argv, opts = {}) {
   if (IS_MAC) {
     const r = await run([GNU_TIME, "-l", ...argv], opts);
-    const match = /^\s*(\d+)\s+maximum resident set size\s*$/m.exec(r.stderr);
+    // The workload shares stderr with time; only the final measurement is time's.
+    const matches = [...r.stderr.matchAll(/^\s*(\d+)\s+maximum resident set size\s*$/gm)];
+    const match = matches.at(-1);
     // BSD time reports bytes; GNU time reports KiB.
     const maxRssKb = match ? Number(match[1]) / 1024 : null;
     return { ...r, maxRssKb, ok: r.ok && maxRssKb !== null };

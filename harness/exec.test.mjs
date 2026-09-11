@@ -14,6 +14,10 @@ function assertStopped(stdout) {
   const pids = [...stdout.matchAll(/^PID (\d+)$/gm)].map((m) => Number(m[1]));
   assert.ok(pids.length >= 2, "exercise a wrapper and its descendant");
   for (const pid of pids) {
+    if (process.platform === "win32") {
+      assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `process ${pid} still running`);
+      continue;
+    }
     const r = spawnSync("ps", ["-p", String(pid), "-o", "stat="], { encoding: "utf8" });
     assert.ok(r.status !== 0 || /^\s*Z/.test(r.stdout), `process ${pid} still running: ${r.stdout}`);
   }
@@ -25,7 +29,7 @@ test("missing executable reports a spawn failure", async () => {
   assert.match(r.spawnError, /ENOENT/);
 });
 
-test("timeout kills the wrapper and descendant retaining its pipes", { skip: !supported }, async () => {
+test("timeout kills the wrapper and descendant retaining its pipes", { skip: !supported && process.platform !== "win32" }, async () => {
   const r = await timeRun(wrapper('console.log("PID " + process.pid); setInterval(() => {}, 1000)'), { timeoutMs: 1000 });
   assert.equal(r.ok, false);
   assert.equal(r.timedOut, true);
@@ -62,4 +66,15 @@ test("RSS wrapper propagates timeout and kills its workload", { skip: !supported
   assert.equal(r.ok, false);
   assert.equal(r.timedOut, true);
   assertStopped(r.stdout);
+});
+
+test("BSD RSS measurement ignores matching lines from workload stderr", { skip: process.platform !== "darwin" }, async () => {
+  const r = await rssRun(node(`
+    console.error("1024 maximum resident set size");
+    console.error("2048 maximum resident set size");
+    const held = Buffer.alloc(64 * 1024 * 1024, 1);
+    setTimeout(() => console.log("RESULT " + held[held.length - 1]), 200);
+  `), { timeoutMs: 5000, memLimitKb: 512 * 1024 });
+  assert.equal(r.ok, true, r.stderr);
+  assert.ok(r.maxRssKb >= 64 * 1024 && r.maxRssKb < 512 * 1024, `used workload's fake RSS: ${r.maxRssKb}`);
 });
