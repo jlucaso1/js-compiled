@@ -87,6 +87,12 @@ for (const name of opts.runners) {
   if (missing) console.error(`skipping ${name}: missing ${missing} (run scripts/setup.sh)`);
   else active.push(name);
 }
+// A selected runner must never become its own correctness oracle.
+const nodeIndex = active.indexOf("node");
+if (nodeIndex > 0) {
+  active.splice(nodeIndex, 1);
+  active.unshift("node");
+}
 
 // Backstop for the RSS watchdog: children inherit oom_score_adj, so if a runner
 // outruns the poll interval the kernel picks it, not the machine.
@@ -98,6 +104,21 @@ const clean = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const firstLines = (t, n = 4) => clean(t).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, n).join(" | ");
 
 const limitKb = opts.memLimitMb * 1024;
+
+function failure(r, phase) {
+  const timeout = phase === "build" ? opts.buildTimeout : opts.timeout;
+  return {
+    status: r.memExceeded ? "out-of-memory" : r.timedOut ? "timeout" : phase === "build" ? "build-failed" : "run-failed",
+    phase,
+    exitCode: r.exitCode,
+    signal: r.signal,
+    peakKb: r.peakKb,
+    error: r.memExceeded
+      ? `exceeded ${opts.memLimitMb} MB RSS (peaked at ${Math.round(r.peakKb / 1024)} MB)`
+      : r.timedOut ? `timeout > ${timeout}s`
+      : r.spawnError || firstLines(r.stderr || r.stdout) || `exit ${r.exitCode}, signal ${r.signal}`,
+  };
+}
 
 async function version(name) {
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
@@ -127,8 +148,8 @@ async function build(name, runner, bench) {
     timeoutMs: opts.buildTimeout * 1000,
     memLimitKb: limitKb,
   });
-  if (!existsSync(outPath)) {
-    return { ok: false, buildMs: r.wallMs, error: r.timedOut ? "build timeout" : firstLines(r.stderr || r.stdout) || `exit ${r.exitCode}` };
+  if (!r.ok || !existsSync(outPath)) {
+    return { ok: false, buildMs: r.wallMs, ...failure(r, "build") };
   }
   return { ok: true, outPath, buildMs: r.wallMs, binBytes: statSync(outPath).size };
 }
@@ -146,6 +167,7 @@ mkdirSync(BUILD_DIR, { recursive: true });
 mkdirSync(RESULT_DIR, { recursive: true });
 
 const versions = Object.fromEntries(await Promise.all(active.map(async (n) => [n, await version(n)])));
+const referenceVersion = versions.node ?? await version("node");
 const porfforDir = path.join(ROOT, "vendor", "porffor");
 let porfforCommit = null;
 if (existsSync(path.join(porfforDir, ".git"))) {
@@ -204,10 +226,11 @@ const results = {
     ci: process.env.GITHUB_ACTIONS === "true",
     commit: process.env.GITHUB_SHA ?? null,
     versions,
+    referenceVersion,
     porfforCommit,
     hermesCommit,
     quickjsCommit,
-    opts: { runs: opts.runs, warmup: opts.warmup, rssRuns: opts.rssRuns, timeout: opts.timeout },
+    opts: { runs: opts.runs, warmup: opts.warmup, rssRuns: opts.rssRuns, timeout: opts.timeout, buildTimeout: opts.buildTimeout, memLimitMb: opts.memLimitMb },
     spawnOverheadMs: spawnOverhead,
   },
   benches: {},
@@ -222,6 +245,11 @@ for (const bench of benches) {
   results.benches[bench] = entry;
   console.log(`\n### ${bench}`);
   let reference = null;
+  if (!active.includes("node")) {
+    const r = await timeRun(RUNNERS.node.cmd(path.join(BENCH_DIR, bench)), { cwd: ROOT, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
+    if (r.ok) reference = resultLine(r.stdout);
+    entry.reference = { version: referenceVersion, output: reference };
+  }
 
   for (const name of active) {
     const runner = RUNNERS[name];
@@ -236,8 +264,8 @@ for (const bench of benches) {
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
       if (!b.ok) {
-        Object.assign(rec, { status: "build-failed", error: b.error });
-        console.log(`BUILD FAILED  ${(b.error ?? "").slice(0, 80)}`);
+        Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
+        console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();
         continue;
       }
@@ -249,39 +277,59 @@ for (const bench of benches) {
 
     const check = await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
     rec.output = resultLine(check.stdout);
+    rec.checkMs = check.wallMs;
+    rec.checkPeakRssKb = check.peakKb;
     if (!check.ok) {
-      Object.assign(rec, {
-        status: check.timedOut ? "timeout" : check.memExceeded ? "out-of-memory" : "run-failed",
-        exitCode: check.exitCode,
-        error: check.timedOut
-          ? `timeout > ${opts.timeout}s`
-          : check.memExceeded
-            ? `exceeded ${opts.memLimitMb} MB RSS (peaked at ${Math.round(check.peakKb / 1024)} MB)`
-            : firstLines(check.stderr || check.stdout),
-      });
+      Object.assign(rec, failure(check, "check"));
       console.log(`${rec.status.toUpperCase()}  ${(rec.error ?? "").slice(0, 80)}`);
       flush();
       continue;
     }
-    if (name === "node" || reference === null) reference = rec.output;
+    if (rec.output === null) {
+      Object.assign(rec, { status: "run-failed", phase: "check", error: "missing RESULT line" });
+      console.log(`RUN-FAILED  ${rec.error}`);
+      flush();
+      continue;
+    }
+    if (name === "node") {
+      reference = rec.output;
+      entry.reference = { version: referenceVersion, output: reference };
+    }
+    if (reference === null) {
+      Object.assign(rec, { status: "reference-failed", error: "Node did not produce a valid RESULT line" });
+      console.log(`REFERENCE-FAILED  ${rec.error}`);
+      flush();
+      continue;
+    }
     rec.matchesReference = rec.output === reference;
 
-    for (let i = 0; i < opts.warmup; i++) await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
-    const times = [];
-    for (let i = 0; i < opts.runs; i++) {
-      const r = await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
+    const accept = (r, phase) => {
       if (!r.ok) {
-        Object.assign(rec, { status: "unstable", error: firstLines(r.stderr) });
-        break;
+        Object.assign(rec, failure(r, phase));
+        return false;
       }
+      if (resultLine(r.stdout) !== rec.output) {
+        Object.assign(rec, { status: "unstable", phase, error: "RESULT changed between runs" });
+        return false;
+      }
+      return true;
+    };
+    for (let i = 0; i < opts.warmup; i++) {
+      if (!accept(await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb }), "warmup")) break;
+    }
+    const times = [];
+    for (let i = 0; rec.status === "ok" && i < opts.runs; i++) {
+      const r = await timeRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
+      if (!accept(r, "timing")) break;
       times.push(r.wallMs);
     }
     rec.time = stats(times);
 
     const rss = [];
-    for (let i = 0; i < opts.rssRuns; i++) {
+    for (let i = 0; rec.status === "ok" && i < opts.rssRuns; i++) {
       const r = await rssRun(argv, { cwd, timeoutMs: opts.timeout * 1000, memLimitKb: limitKb });
-      if (r.ok) rss.push(r.maxRssKb);
+      if (!accept(r, "rss")) break;
+      rss.push(r.maxRssKb);
     }
     rec.maxRssKb = rss.length ? Math.max(...rss) : null;
 
@@ -294,6 +342,7 @@ for (const bench of benches) {
         (rec.binBytes ? `   bin ${(rec.binBytes / 1024).toFixed(0)} KB   build ${(rec.buildMs / 1000).toFixed(2)} s` : "") +
         (rec.matchesReference === false ? "   OUTPUT MISMATCH" : ""),
     );
+    if (rec.status !== "ok") console.log(`    ${rec.status.toUpperCase()} (${rec.phase}): ${rec.error}`);
   }
 }
 

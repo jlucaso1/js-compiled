@@ -5,6 +5,7 @@ export const ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
 const PORFFOR = path.join(ROOT, "vendor", "porffor", "runtime", "index.js");
 const SHERMES = path.join(ROOT, "vendor", "hermes", "build", "bin", "shermes");
+const PERRY = process.env.PERRY_BIN || BIN("perry");
 const VENDOR_QJS = path.join(ROOT, "vendor", "quickjs", "build", "qjs");
 
 function resolveQjs() {
@@ -55,6 +56,13 @@ export const RUNNERS = {
     compile: (file, out) => ["node", PORFFOR, "native", "--module", "-t", file, "-o", out],
   },
 
+  perry: {
+    label: "Perry",
+    tier: "core",
+    mode: "compiled",
+    version: [PERRY, "--version"],
+    compile: (file, out) => [PERRY, "compile", file, "-o", out],
+  },
 
   "scriptc-dynamic": {
     label: "scriptc --dynamic",

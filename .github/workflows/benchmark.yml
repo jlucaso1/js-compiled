@@ -17,6 +17,8 @@ on:
       - benches/**
       - harness/**
       - scripts/**
+      - package.json
+      - package-lock.json
       - .github/workflows/benchmark.yml
 
 permissions:
@@ -147,6 +149,7 @@ jobs:
       - name: Record toolchain versions
         run: |
           node --version
+          node_modules/.bin/perry --version
           bun --version
           deno --version
           clang --version | head -1

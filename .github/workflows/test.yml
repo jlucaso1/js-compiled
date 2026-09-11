@@ -1,0 +1,70 @@
+name: harness tests
+
+on:
+  push:
+    paths:
+      - harness/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/test.yml
+  pull_request:
+    paths:
+      - harness/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: latest
+      - run: npm test
+
+  perry-memory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: latest
+          cache: npm
+      - run: npm ci
+      - name: Check Perry on the allocation-heavy workloads
+        run: |
+          node harness/run.mjs --runners=node,perry --benches=23-binary-trees,31-json \
+            --quick --timeout=120 --mem-limit-mb=4096 --out=results/perry-memory.json
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const data = JSON.parse(readFileSync("results/perry-memory.json", "utf8"));
+          assert.equal(Object.keys(data.benches).length, 2);
+          for (const [bench, entry] of Object.entries(data.benches)) {
+            for (const runner of ["node", "perry"]) {
+              const result = entry.runners[runner];
+              assert.equal(result.status, "ok", `${bench}/${runner}: ${result.error}`);
+              assert.equal(result.matchesReference, true, `${bench}/${runner}: output differs`);
+              assert.ok(result.maxRssKb > 0, `${bench}/${runner}: missing RSS`);
+            }
+          }
+          NODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perry-memory-linux
+          path: results/perry-memory.json
