@@ -120,6 +120,14 @@ export const RUNNERS = {
     compile: (file, out) => ["deno", "compile", "-A", "--no-check", "-o", out, file],
   },
 
+  "deno-compile-quickjs": {
+    label: "deno compile --engine quickjs",
+    tier: "extra",
+    mode: "compiled",
+    version: ["deno", "--version"],
+    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--engine", "quickjs", "-o", out, file],
+  },
+
   deno: {
     label: "Deno",
     tier: "extra",
