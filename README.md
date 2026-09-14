@@ -27,7 +27,7 @@ Extras, enabled with `--runners=all`:
 | `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
 | `deno-compile` | `deno compile` (V8) — same idea |
-| `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine |
+| `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine (requires Deno 2.9.5 or later) |
 | `deno` | Deno executing directly |
 
 `bun-compile` and `deno-compile` (including `deno-compile-quickjs`) produce "a binary", but they are not AOT
