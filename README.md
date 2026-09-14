@@ -26,10 +26,11 @@ Extras, enabled with `--runners=all`:
 | `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
 | `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
-| `deno-compile` | `deno compile` — same idea |
+| `deno-compile` | `deno compile` (V8) — same idea |
+| `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine |
 | `deno` | Deno executing directly |
 
-`bun-compile` and `deno-compile` produce "a binary", but they are not AOT
+`bun-compile` and `deno-compile` (including `deno-compile-quickjs`) produce "a binary", but they are not AOT
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 

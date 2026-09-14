@@ -125,3 +125,6 @@ fi
 
 command -v clang >/dev/null || echo "warning: clang not found (scriptc and shermes need it)"
 command -v cc >/dev/null || echo "warning: cc not found (porffor and quickjs need it)"
+
+# scriptc 0.1.1 ships its LLVM helper without the executable bit set.
+chmod +x node_modules/@scriptc/llvm-*/bin/scriptc-llvm-codegen 2>/dev/null || true
