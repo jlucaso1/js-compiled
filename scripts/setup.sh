@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Porffor has no package.json on main, so it is vendored from git at a pinned commit.
-PORFFOR_REF="${PORFFOR_REF:-1f4ae4ae3e0a5f0a93b3bc084359e1a3a23391fd}"
+PORFFOR_REF="${PORFFOR_REF:-038f415e08efc5f87a6bfcb05a18824caa3a14f6}"
 PORFFOR_COMMIT_FILE="vendor/porffor/.porffor_commit"
 CURRENT_PORFFOR=""
 
@@ -80,7 +80,7 @@ else
 fi
 
 # QuickJS-ng
-QUICKJS_REF="${QUICKJS_REF:-v0.16.2}"
+QUICKJS_REF="${QUICKJS_REF:-7e322b3236ae7f8b166b603df5557b217cb53945}"
 QUICKJS_COMMIT_FILE="vendor/quickjs/.quickjs_commit"
 BUILT_QUICKJS_COMMIT_FILE="vendor/quickjs/build/.built_commit"
 
@@ -94,7 +94,7 @@ elif [ -f "$QUICKJS_COMMIT_FILE" ]; then
   CURRENT_QUICKJS="$(cat "$QUICKJS_COMMIT_FILE" 2>/dev/null || true)"
 fi
 
-if [ -f vendor/quickjs/build/qjs ] && [ -n "$LAST_BUILT_QUICKJS_COMMIT" ] && { [ "$LAST_BUILT_QUICKJS_COMMIT" = "$QUICKJS_REF" ] || [ "$CURRENT_QUICKJS" = "$LAST_BUILT_QUICKJS_COMMIT" ]; }; then
+if [ -f vendor/quickjs/build/qjs ] && [ -n "$CURRENT_QUICKJS" ] && [ "$CURRENT_QUICKJS" = "$QUICKJS_REF" ] && [ "$LAST_BUILT_QUICKJS_COMMIT" = "$CURRENT_QUICKJS" ]; then
   echo "$LAST_BUILT_QUICKJS_COMMIT" > "$QUICKJS_COMMIT_FILE"
   echo "quickjs ${LAST_BUILT_QUICKJS_COMMIT:0:7}"
 else
@@ -126,7 +126,7 @@ fi
 command -v clang >/dev/null || echo "warning: clang not found (scriptc and shermes need it)"
 command -v cc >/dev/null || echo "warning: cc not found (porffor and quickjs need it)"
 
-# scriptc 0.1.1 ships its LLVM helper without the executable bit set.
+# scriptc ships its LLVM helper without the executable bit set.
 for helper in node_modules/@scriptc/llvm-*/bin/scriptc-llvm-codegen; do
   [ -e "$helper" ] || continue
   chmod +x "$helper" || exit 1

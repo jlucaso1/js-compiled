@@ -13,14 +13,14 @@
   "type": "module",
   "dependencies": {
     "@perryts/perry": "0.5.1520",
-    "scriptc": "^0.1.1"
+    "scriptc": "^0.1.2"
   },
   "overrides": {
     "@scriptc/llvm-darwin-x64": "0.1.0",
     "@scriptc/runtime-darwin-x64": "0.1.0"
   },
   "allowScripts": {
-    "scriptc@0.1.1": true
+    "scriptc@0.1.2": true
   },
   "private": true
 }
