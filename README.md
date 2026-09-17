@@ -35,7 +35,7 @@ compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
 Porffor, Static Hermes, and QuickJS-ng are vendored from git at their latest commits / pinned releases (Porffor
-on `main`, Hermes on `static_h`, QuickJS-ng on `v0.16.2`); their exact commits are recorded in every result
+on `main`, Hermes on `static_h`, QuickJS-ng on `master`); their exact commits are recorded in every result
 file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
