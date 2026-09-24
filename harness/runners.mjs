@@ -176,8 +176,7 @@ export function missingDependency(name) {
   if (name === "jz-native") {
     const wasm2c = path.join(ROOT, "vendor", "wabt", "build", "wasm2c");
     if (!existsSync(wasm2c)) return `${wasm2c} (run scripts/setup-jz-native.sh)`;
-    const cc = process.env.CC || "clang";
-    if (!commandExists(cc)) return `${cc} (required by jz-native; set CC)`;
+    if (!commandExists("clang")) return "clang (required by jz-native)";
   }
   return null;
 }

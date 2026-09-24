@@ -21,7 +21,7 @@ function runtime() {
   }
 }
 
-async function fixture({ phase = "none", runners = "perry", warmup = 0, output = "7" } = {}) {
+async function fixture({ phase = "none", runners = "perry", warmup = 0, output = "7", buildError = "fixture build failed after writing output" } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "js-compiled-harness-"));
   try {
     mkdirSync(path.join(dir, "harness"));
@@ -39,7 +39,7 @@ const count = out + ".count";
 rmSync(count, {force: true});
 const phase = process.env.FIXTURE_PHASE;
 writeFileSync(out, ${JSON.stringify(`#!${process.execPath}\n(${runtime.toString()})();\n`)}, {mode: 0o755});
-if (phase === "build") { console.error("fixture build failed after writing output"); process.exit(2); }
+if (phase === "build") { console.error(${JSON.stringify(buildError)}); process.exit(2); }
 `, { mode: 0o755 });
     const argv = [path.join(dir, "harness", "run.mjs"), `--runners=${runners}`, "--runs=1", `--warmup=${warmup}`, "--rss-runs=1", "--timeout=3", "--build-timeout=3", "--mem-limit-mb=192"];
     const log = await new Promise((resolve, reject) => {
@@ -68,6 +68,14 @@ test("compiler nonzero exit fails even when it wrote a binary", { skip: !support
   assert.equal(result.phase, "build");
   assert.equal(result.exitCode, 2);
   assert.equal(result.output, undefined);
+});
+
+test("compiler unsupported diagnostic retains build-failed status", { skip: !supported }, async () => {
+  const { result } = await fixture({ phase: "build", buildError: "unsupported compiler option" });
+  assert.equal(result.status, "build-failed");
+  assert.equal(result.phase, "build");
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.error, "unsupported compiler option");
 });
 
 for (const phase of ["check", "warmup", "timing", "rss"]) {

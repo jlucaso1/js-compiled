@@ -10,4 +10,4 @@ const output = (cmd, args) => {
 };
 const jzCommit = readFileSync(path.join(ROOT, "vendor", "jz", ".jz_commit"), "utf8").trim();
 const wabtCommit = readFileSync(path.join(ROOT, "vendor", "wabt", ".wabt_commit"), "utf8").trim();
-console.log(`jz ${jzCommit}; wasm2c ${output(path.join(ROOT, "vendor", "wabt", "build", "wasm2c"), ["--version"])} (${wabtCommit}); ${output(process.env.CC || "clang", ["--version"])}`);
+console.log(`jz ${jzCommit}; wasm2c ${output(path.join(ROOT, "vendor", "wabt", "build", "wasm2c"), ["--version"])} (${wabtCommit}); ${output("clang", ["--version"])}`);

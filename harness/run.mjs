@@ -279,8 +279,7 @@ for (const bench of benches) {
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
       if (!b.ok) {
-        const unsupported = b.status === "build-failed" && /unsupported/i.test(b.error ?? "");
-        Object.assign(rec, { status: unsupported ? "unsupported" : b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
+        Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
         console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();
         continue;
