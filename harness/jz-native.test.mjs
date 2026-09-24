@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { ROOT, RUNNERS } from "./runners.mjs";
 import { adaptNumericResult } from "./jz-native-source.mjs";
+import { assertVendorClean } from "../scripts/check-vendor-clean.mjs";
 
 test("jz-native wiring names the actual standalone compilation stages", () => {
   const runner = RUNNERS["jz-native"];
@@ -22,6 +25,30 @@ test("jz-native adapts only a single final numeric RESULT and rejects extra outp
   assert.match(adaptNumericResult(noop), /export function benchResult\(\) \{ return \(0\); \}/);
   assert.match(adaptNumericResult(fib), /acc\); \}/);
   assert.throws(() => adaptNumericResult(hello), /unsupported output/);
+});
+
+test("pinned vendor check rejects staged and unstaged tracked changes but permits untracked build files", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "jz-vendor-clean-"));
+  const git = (...args) => execFileSync("git", args, { cwd: directory, stdio: "ignore" });
+  try {
+    git("init", "-q");
+    git("config", "user.email", "test@example.invalid");
+    git("config", "user.name", "Test");
+    writeFileSync(path.join(directory, "compiler.js"), "original\n");
+    git("add", "compiler.js");
+    git("commit", "-qm", "pinned source");
+    writeFileSync(path.join(directory, "build-output"), "generated\n");
+    assert.doesNotThrow(() => assertVendorClean(directory));
+
+    writeFileSync(path.join(directory, "compiler.js"), "unstaged modification\n");
+    assert.throws(() => assertVendorClean(directory), /tracked changes/);
+    git("checkout", "--", "compiler.js");
+    writeFileSync(path.join(directory, "compiler.js"), "staged modification\n");
+    git("add", "compiler.js");
+    assert.throws(() => assertVendorClean(directory), /tracked changes/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("jz-native adapts typed functions and variables into executable JavaScript", async () => {
