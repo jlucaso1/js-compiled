@@ -23,3 +23,16 @@ test("jz-native adapts only a single final numeric RESULT and rejects extra outp
   assert.match(adaptNumericResult(fib), /acc\); \}/);
   assert.throws(() => adaptNumericResult(hello), /unsupported output/);
 });
+
+test("jz-native adapts typed functions and variables into executable JavaScript", async () => {
+  const source = `function fib(n: number): number {
+    if (n < 2) return n;
+    return fib(n - 1) + fib(n - 2);
+  }
+  let acc: number = 0;
+  for (let i: number = 0; i < 6; i++) acc += fib(3 + i);
+  console.log("RESULT " + acc);`;
+  const adapted = adaptNumericResult(source);
+  const module = await import(`data:text/javascript,${encodeURIComponent(adapted)}`);
+  assert.equal(module.benchResult(), 52);
+});
