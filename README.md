@@ -63,6 +63,8 @@ Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc's g
 
 The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
 
+When reusing `vendor/jz` or `vendor/wabt`, setup rejects staged or unstaged tracked changes before fetching or checking out that repository. Preserve any local edits elsewhere and restore the tracked files before retrying. Untracked build files are allowed.
+
 For a local Perry compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
 
 ```bash
