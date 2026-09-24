@@ -74,6 +74,18 @@ export const RUNNERS = {
     compile: (file, out) => [PERRY, "compile", file, "-o", out],
   },
 
+  "jz-native": {
+    label: "jz → wasm2c → clang -O3",
+    tier: "extra",
+    mode: "compiled",
+    requires: path.join(ROOT, "vendor", "jz", "index.js"),
+    version: [process.execPath, path.join(ROOT, "harness", "jz-native-version.mjs")],
+    supports: (bench) => ["00-noop.ts", "10-fib.ts"].includes(bench)
+      ? null
+      : "requires a validated single numeric RESULT output and no JS-host imports; this fixture is not yet supported",
+    compile: (file, out) => [process.execPath, path.join(ROOT, "harness", "jz-native-build.mjs"), file, out],
+  },
+
   "scriptc-dynamic": {
     label: "scriptc --dynamic",
     tier: "extra",
@@ -161,5 +173,11 @@ export function missingDependency(name) {
   const r = RUNNERS[name];
   if (r.requires && !existsSync(r.requires)) return r.requires;
   if (name === "geatsc" && !commandExists(CXX)) return `${CXX} (C++20 compiler; set CXX)`;
+  if (name === "jz-native") {
+    const wasm2c = path.join(ROOT, "vendor", "wabt", "build", "wasm2c");
+    if (!existsSync(wasm2c)) return `${wasm2c} (run scripts/setup-jz-native.sh)`;
+    const cc = process.env.CC || "clang";
+    if (!commandExists(cc)) return `${cc} (required by jz-native; set CC)`;
+  }
   return null;
 }

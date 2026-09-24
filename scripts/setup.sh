@@ -131,3 +131,7 @@ for helper in node_modules/@scriptc/llvm-*/bin/scriptc-llvm-codegen; do
   [ -e "$helper" ] || continue
   chmod +x "$helper" || exit 1
 done
+
+# jz's native lane needs a commit-pinned compiler source and WABT's wasm2c
+# runtime. Hosted CI provisions clang/cmake/ninja before invoking this setup.
+./scripts/setup-jz-native.sh

@@ -191,6 +191,12 @@ if (!hermesCommit && existsSync(path.join(hermesDir, "build", ".built_commit")))
 }
 
 const quickjsDir = path.join(ROOT, "vendor", "quickjs");
+const jzCommit = existsSync(path.join(ROOT, "vendor", "jz", ".jz_commit"))
+  ? readFileSync(path.join(ROOT, "vendor", "jz", ".jz_commit"), "utf8").trim()
+  : null;
+const wabtCommit = existsSync(path.join(ROOT, "vendor", "wabt", ".wabt_commit"))
+  ? readFileSync(path.join(ROOT, "vendor", "wabt", ".wabt_commit"), "utf8").trim()
+  : null;
 let quickjsCommit = null;
 if (existsSync(path.join(quickjsDir, ".git"))) {
   const r = await timeRun(["git", "-C", quickjsDir, "rev-parse", "HEAD"], { timeoutMs: 30000 });
@@ -230,6 +236,8 @@ const results = {
     porfforCommit,
     hermesCommit,
     quickjsCommit,
+    jzCommit,
+    wabtCommit,
     opts: { runs: opts.runs, warmup: opts.warmup, rssRuns: opts.rssRuns, timeout: opts.timeout, buildTimeout: opts.buildTimeout, memLimitMb: opts.memLimitMb },
     spawnOverheadMs: spawnOverhead,
   },
@@ -256,6 +264,13 @@ for (const bench of benches) {
     const rec = { mode: runner.mode, label: runner.label, version: versions[name], status: "ok" };
     entry.runners[name] = rec;
     process.stdout.write(`  ${name.padEnd(17)} `);
+    const unsupported = runner.supports?.(bench);
+    if (unsupported) {
+      Object.assign(rec, { status: "unsupported", error: unsupported });
+      console.log(`UNSUPPORTED  ${unsupported}`);
+      flush();
+      continue;
+    }
 
     let argv;
     let cwd = BUILD_DIR;
@@ -264,7 +279,8 @@ for (const bench of benches) {
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
       if (!b.ok) {
-        Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
+        const unsupported = b.status === "build-failed" && /unsupported/i.test(b.error ?? "");
+        Object.assign(rec, { status: unsupported ? "unsupported" : b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
         console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();
         continue;
