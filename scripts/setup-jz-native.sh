@@ -15,8 +15,8 @@ clone_at() {
   current="$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)"
   if [ "$current" != "$ref" ]; then
     git -C "$dir" fetch --depth 1 origin "$ref"
-    git -C "$dir" checkout --detach -q FETCH_HEAD
   fi
+  git -C "$dir" checkout --detach -q "$ref"
 }
 
 clone_at dy/jz vendor/jz "$JZ_REF"
