@@ -13,7 +13,8 @@ Results are produced entirely by GitHub Actions and published to GitHub Pages.
 |---|---|---|
 | `node` | executes directly | Node.js (V8, JIT), runs `.ts` via type stripping |
 | `bun` | executes directly | Bun (JavaScriptCore, JIT) |
-| `scriptc` | **compiles** | [vercel-labs/scriptc](https://github.com/vercel-labs/scriptc) — TS → IR → LLVM → native, no JS engine |
+| `scriptc` | **compiles** | [vercel-labs/scriptc](https://github.com/vercel-labs/scriptc) — TS → IR → LLVM → native, no JS engine; pinned to 0.1.4 |
+| `geatsc` | **compiles** | [geastack/compiler](https://github.com/geastack/compiler) — TypeScript → C++ → native with a C++20 toolchain, no JS engine; pinned to 1.0.18 |
 | `porffor` | **compiles** | [CanadaHonk/porffor](https://github.com/CanadaHonk/porffor) — AOT JS/TS → C → native |
 | `perry` | **compiles** | [PerryTS/perry](https://github.com/PerryTS/perry) — TypeScript → native, pinned to 0.5.1520 |
 
@@ -34,9 +35,10 @@ Extras, enabled with `--runners=all`:
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
-Porffor, Static Hermes, and QuickJS-ng are vendored from git at their latest commits / pinned releases (Porffor
-on `main`, Hermes on `static_h`, QuickJS-ng on `master`); their exact commits are recorded in every result
-file. Perry is pinned to 0.5.1520 for reproducibility.
+Porffor, Static Hermes, and QuickJS-ng are vendored from git; local setup pins Porffor to
+`de4eb588264885b3a1596f75010e371a2052033f`, while the benchmark workflow resolves the latest `main`
+commit at run time. Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
+are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
 
@@ -45,7 +47,7 @@ npm ci
 ./scripts/setup.sh                 # vendors Porffor and builds Static Hermes and QuickJS-ng
 
 node harness/run.mjs --list        # benches and runners
-node harness/run.mjs               # the five main candidates, 5 runs each
+node harness/run.mjs               # the six core candidates, 5 runs each
 node harness/run.mjs --runners=all
 node harness/run.mjs --benches=10-fib --runs=10
 node harness/run.mjs --quick       # 1 run, no warmup
@@ -54,9 +56,11 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+Requires Node 24+, `clang` (scriptc, Static Hermes), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
-Perry uses the exact release in `package-lock.json`. For a local compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
+Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
+
+For a local Perry compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
 
 ```bash
 PERRY_BIN=/absolute/path/to/perry node harness/run.mjs --runners=node,perry --quick
