@@ -31,6 +31,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: latest
+      - name: Install GNU time for Linux RSS tests
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
       - run: npm test
 
   perry-memory:
@@ -44,6 +47,8 @@ jobs:
         with:
           node-version: latest
           cache: npm
+      - name: Install GNU time for RSS measurements
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
       - run: npm ci
       - name: Check Perry on the allocation-heavy workloads
         run: |

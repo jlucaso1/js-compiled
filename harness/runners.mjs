@@ -6,6 +6,7 @@ const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
 const PORFFOR = path.join(ROOT, "vendor", "porffor", "runtime", "index.js");
 const SHERMES = path.join(ROOT, "vendor", "hermes", "build", "bin", "shermes");
 const PERRY = process.env.PERRY_BIN || BIN("perry");
+const CXX = process.env.CXX || "c++";
 const VENDOR_QJS = path.join(ROOT, "vendor", "quickjs", "build", "qjs");
 
 function resolveQjs() {
@@ -45,6 +46,15 @@ export const RUNNERS = {
     mode: "compiled",
     version: [BIN("scriptc"), "--version"],
     compile: (file, out) => [BIN("scriptc"), "build", file, "-o", out, "--no-keep-c"],
+  },
+
+  geatsc: {
+    label: "geatsc + C++20",
+    tier: "core",
+    mode: "compiled",
+    requires: path.join(ROOT, "node_modules", "@geastack", "compiler", "dist", "cli.js"),
+    version: [process.execPath, path.join(ROOT, "harness", "geatsc-version.mjs")],
+    compile: (file, out) => [process.execPath, path.join(ROOT, "harness", "geatsc-build.mjs"), file, out],
   },
 
   porffor: {
@@ -139,7 +149,17 @@ export const RUNNERS = {
 
 export const CORE = Object.keys(RUNNERS).filter((k) => RUNNERS[k].tier === "core");
 
+function commandExists(command) {
+  const names = process.platform === "win32" && !path.extname(command)
+    ? [command, ...(process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";").map((ext) => `${command}${ext}`)]
+    : [command];
+  if (command.includes(path.sep)) return names.some(existsSync);
+  return (process.env.PATH || "").split(path.delimiter).some((dir) => names.some((name) => existsSync(path.join(dir, name))));
+}
+
 export function missingDependency(name) {
   const r = RUNNERS[name];
-  return r.requires && !existsSync(r.requires) ? r.requires : null;
+  if (r.requires && !existsSync(r.requires)) return r.requires;
+  if (name === "geatsc" && !commandExists(CXX)) return `${CXX} (C++20 compiler; set CXX)`;
+  return null;
 }

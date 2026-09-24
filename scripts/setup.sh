@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Porffor has no package.json on main, so it is vendored from git at a pinned commit.
-PORFFOR_REF="${PORFFOR_REF:-038f415e08efc5f87a6bfcb05a18824caa3a14f6}"
+PORFFOR_REF="${PORFFOR_REF:-de4eb588264885b3a1596f75010e371a2052033f}"
 PORFFOR_COMMIT_FILE="vendor/porffor/.porffor_commit"
 CURRENT_PORFFOR=""
 
