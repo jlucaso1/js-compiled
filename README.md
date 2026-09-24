@@ -35,9 +35,9 @@ Extras, enabled with `--runners=all`:
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
-Porffor, Static Hermes, and QuickJS-ng are vendored from git; local setup pins Porffor to
-`de4eb588264885b3a1596f75010e371a2052033f`, while the benchmark workflow resolves the latest `main`
-commit at run time. Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
+Porffor, Static Hermes, and QuickJS-ng are vendored from git. Local setup and the benchmark workflow
+both use the Porffor commit pinned in `scripts/setup.sh`, currently
+`de4eb588264885b3a1596f75010e371a2052033f`. Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
 are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
@@ -150,7 +150,7 @@ harness/exec.mjs      timing and RSS measurement
 harness/run.mjs       orchestration, writes the result JSON
 harness/merge.mjs     merges CI shards into one result file
 harness/report.mjs    result JSON -> REPORT.md + site/index.html
-scripts/setup.sh      vendors Porffor at the latest commit
+scripts/setup.sh      vendors Porffor at a pinned commit
 ```
 
 ## License
