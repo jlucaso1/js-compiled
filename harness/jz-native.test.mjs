@@ -64,7 +64,9 @@ test("jz-native adapts typed functions and variables into executable JavaScript"
   assert.equal(module.benchResult(), 52);
 });
 
-test("native setup populates fresh clones and protects existing vendor changes", () => {
+test("native setup populates fresh clones and protects existing vendor changes", {
+  skip: process.platform === "win32" && "Native setup requires POSIX shell paths and executables",
+}, () => {
   const directory = mkdtempSync(path.join(ROOT, ".jz-setup-test-"));
   const upstream = path.join(directory, "upstream");
   const bin = path.join(directory, "bin");
