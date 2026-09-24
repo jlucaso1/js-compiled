@@ -48,11 +48,11 @@ if (!exports.includes("benchResult")) fail("jz output did not export benchResult
 const dir = path.dirname(outputFile);
 mkdirSync(dir, { recursive: true });
 const wasmFile = `${outputFile}.wasm`;
-const cFile = `${outputFile}.c`;
+const cFile = path.join(dir, `jz-${path.basename(outputFile)}.c`);
 const mainFile = `${outputFile}-main.c`;
 writeFileSync(wasmFile, wasm);
 run(wasm2c, ["-n", "jzbench", "-o", cFile, wasmFile]);
-writeFileSync(mainFile, `#include <stdio.h>\n#include "${path.basename(outputFile)}.h"\n#include "wasm-rt-impl.h"\nint main(void) {\n  wasm_rt_init();\n  w2c_jzbench instance;\n  wasm2c_jzbench_instantiate(&instance);\n  double result = w2c_jzbench_benchResult(&instance);\n  printf("RESULT %.17g\\n", result);\n  wasm2c_jzbench_free(&instance);\n  wasm_rt_free();\n  return 0;\n}\n`);
+writeFileSync(mainFile, `#include <stdio.h>\n#include "${path.basename(cFile, ".c")}.h"\n#include "wasm-rt-impl.h"\nint main(void) {\n  wasm_rt_init();\n  w2c_jzbench instance;\n  wasm2c_jzbench_instantiate(&instance);\n  double result = w2c_jzbench_benchResult(&instance);\n  printf("RESULT %.17g\\n", result);\n  wasm2c_jzbench_free(&instance);\n  wasm_rt_free();\n  return 0;\n}\n`);
 run("clang", [
   "-O3", "-I", runtimeDir, "-I", dir, cFile, mainFile,
   path.join(runtimeDir, "wasm-rt-impl.c"),
