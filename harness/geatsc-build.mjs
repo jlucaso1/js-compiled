@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Compile a TypeScript bench to C++ with geatsc, then link and run it natively.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";

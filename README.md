@@ -13,8 +13,8 @@ Results are produced entirely by GitHub Actions and published to GitHub Pages.
 |---|---|---|
 | `node` | executes directly | Node.js (V8, JIT), runs `.ts` via type stripping |
 | `bun` | executes directly | Bun (JavaScriptCore, JIT) |
-| `scriptc` | **compiles** | [vercel-labs/scriptc](https://github.com/vercel-labs/scriptc) — TS → IR → LLVM → native, no JS engine; pinned to 0.1.4 |
-| `geatsc` | **compiles** | [geastack/compiler](https://github.com/geastack/compiler) — TypeScript → C++ → native with a C++20 toolchain, no JS engine; pinned to 1.0.18 |
+| `scriptc` | **compiles** | [vercel-labs/scriptc](https://github.com/vercel-labs/scriptc), TS → IR → LLVM → native, no JS engine |
+| `geatsc` | **compiles** | [geastack/compiler](https://github.com/geastack/compiler), TypeScript → C++ → native with a C++20 toolchain, no JS engine |
 | `porffor` | **compiles** | [CanadaHonk/porffor](https://github.com/CanadaHonk/porffor) — AOT JS/TS → C → native |
 | `perry` | **compiles** | [PerryTS/perry](https://github.com/PerryTS/perry) — TypeScript → native, pinned to 0.5.1520 |
 
@@ -36,8 +36,8 @@ compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
 Porffor, Static Hermes, and QuickJS-ng are vendored from git. Local setup and the benchmark workflow
-both use the Porffor commit pinned in `scripts/setup.sh`, currently
-`de4eb588264885b3a1596f75010e371a2052033f`. Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
+both use the Porffor commit pinned in [`scripts/setup.sh`](scripts/setup.sh).
+Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
 are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
@@ -121,7 +121,9 @@ does not dominate, low enough for a JIT-less AOT binary to finish.
   their input per iteration. Without that, an AOT compiler folds a pure repeated
   computation into a single call while V8 executes all of them, and the benchmark
   measures optimizer luck instead of the workload.
-- Every bench is single-threaded. No per-runner tuning: everything runs on defaults.
+- Every bench is single-threaded. Runner commands are defined in
+  [`harness/runners.mjs`](harness/runners.mjs), with geatsc's C++ build flags
+  defined in [`harness/geatsc-build.mjs`](harness/geatsc-build.mjs).
 
 ### Not measured
 

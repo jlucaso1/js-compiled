@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Record both the pinned geatsc release and the native compiler used by its runner.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
