@@ -155,7 +155,7 @@ harness/exec.mjs      timing and RSS measurement
 harness/run.mjs       orchestration, writes the result JSON
 harness/merge.mjs     merges CI shards into one result file
 harness/report.mjs    result JSON -> REPORT.md + site/index.html
-scripts/setup.sh      vendors Porffor at a pinned commit
+scripts/setup.sh      toolchain setup, see Usage
 ```
 
 ## License

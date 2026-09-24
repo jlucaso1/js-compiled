@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Prepare the pinned jz wasm2c native toolchain. This build is intentionally
-# kept in hosted CI; the native compiler and WABT are not npm dependencies.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

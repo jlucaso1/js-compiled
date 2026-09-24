@@ -26,9 +26,6 @@ const runtimeDir = path.join(wabtDir, "wasm2c");
 if (!existsSync(path.join(jzDir, "index.js")) || !existsSync(wasm2c)) fail("jz-native toolchain is not set up; run scripts/setup-jz-native.sh");
 
 const source = readFileSync(sourceFile, "utf8");
-// Only the final scalar RESULT line is adapted: its expression becomes an
-// exported numeric function. The benchmark's computation and initialization
-// remain in the wasm module; unsupported output shapes are rejected, not faked.
 let adapted;
 try { adapted = adaptNumericResult(source); }
 catch (error) { fail(error.message); }
@@ -36,6 +33,8 @@ catch (error) { fail(error.message); }
 let wasm;
 try {
   const { compile } = await import(pathToFileURL(path.join(jzDir, "index.js")).href);
+  // Keep module initialization in the measured executable. Snapshotting it
+  // would move the top-level benchmark computation into compile time.
   wasm = compile(adapted, { host: "native", optimize: { level: "speed", snapshotInit: false } });
 } catch (error) {
   fail(`jz compile failed: ${error?.message ?? error}`);
