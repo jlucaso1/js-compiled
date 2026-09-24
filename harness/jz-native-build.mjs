@@ -36,7 +36,7 @@ catch (error) { fail(error.message); }
 let wasm;
 try {
   const { compile } = await import(pathToFileURL(path.join(jzDir, "index.js")).href);
-  wasm = compile(adapted, { host: "native", optimize: "speed" });
+  wasm = compile(adapted, { host: "native", optimize: { level: "speed", snapshotInit: false } });
 } catch (error) {
   fail(`jz compile failed: ${error?.message ?? error}`);
 }
