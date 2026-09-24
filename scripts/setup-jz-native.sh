@@ -10,8 +10,7 @@ clone_at() {
   if [ ! -d "$dir/.git" ]; then
     mkdir -p "$(dirname "$dir")"
     git clone --depth 1 --filter=blob:none --no-checkout "https://github.com/${repo}.git" "$dir"
-  fi
-  if [ -d "$dir/.git" ]; then
+  else
     node scripts/check-vendor-clean.mjs "$dir"
   fi
   local current
