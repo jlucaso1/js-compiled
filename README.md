@@ -30,6 +30,7 @@ Extras, enabled with `--runners=all`:
 | `deno-compile` | `deno compile` (V8) — same idea |
 | `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine (requires Deno 2.9.5 or later) |
 | `deno` | Deno executing directly |
+| `jz-native` | [jz](https://jz.js.org/) → WebAssembly → WABT `wasm2c` → `clang -O3`, standalone native executable; source revisions pinned in `scripts/setup-jz-native.sh` |
 
 `bun-compile` and `deno-compile` (including `deno-compile-quickjs`) produce "a binary", but they are not AOT
 compilers: they embed the whole runtime. They are here to anchor the binary-size
@@ -44,7 +45,7 @@ are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibili
 
 ```sh
 npm ci
-./scripts/setup.sh                 # vendors Porffor and builds Static Hermes and QuickJS-ng
+./scripts/setup.sh                 # vendors Porffor, Static Hermes, QuickJS-ng, and pinned jz/WABT
 
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the six core candidates, 5 runs each
@@ -56,9 +57,11 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+Requires Node 24+, `clang` (scriptc, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources; `npm run setup` installs the pinned toolchain. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
 Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
+
+The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
 
 For a local Perry compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
 
@@ -152,7 +155,7 @@ harness/exec.mjs      timing and RSS measurement
 harness/run.mjs       orchestration, writes the result JSON
 harness/merge.mjs     merges CI shards into one result file
 harness/report.mjs    result JSON -> REPORT.md + site/index.html
-scripts/setup.sh      vendors Porffor at a pinned commit
+scripts/setup.sh      toolchain setup, see Usage
 ```
 
 ## License

@@ -52,6 +52,8 @@ md.push(mdTable([["runner", "version"], ...runners.map((r) => [r, benches.map((b
 if (data.meta.porfforCommit) md.push(`\nPorffor commit: \`${data.meta.porfforCommit}\``);
 if (data.meta.hermesCommit) md.push(`\nStatic Hermes commit: \`${data.meta.hermesCommit}\``);
 if (data.meta.quickjsCommit) md.push(`\nQuickJS-ng commit: \`${data.meta.quickjsCommit}\``);
+if (data.meta.jzCommit) md.push(`\njz native commit: \`${data.meta.jzCommit}\``);
+if (data.meta.wabtCommit) md.push(`\nWABT commit: \`${data.meta.wabtCommit}\``);
 
 md.push("\n## Coverage\n");
 md.push(mdTable([

@@ -77,16 +77,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
       - name: Install build tools
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == ''
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ ninja-build libicu-dev
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == ''
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ cmake ninja-build libicu-dev
 
       - name: Setup vendored toolchains
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == ''
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == ''
         run: |
           npm ci
           ./scripts/setup.sh
@@ -130,7 +130,7 @@ jobs:
           deno-version: v2.x
 
       - name: Install system tools
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ libicu-dev
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ cmake ninja-build libicu-dev
 
       - name: Download vendored toolchains
         uses: actions/download-artifact@v4
@@ -163,6 +163,7 @@ jobs:
           clang --version | head -1
           vendor/hermes/build/bin/shermes -version 2>/dev/null | grep -i "Static Hermes" || true
           vendor/quickjs/build/qjs -v 2>/dev/null || qjs -v 2>/dev/null || true
+          vendor/wabt/build/wasm2c --version
           node harness/run.mjs --list
 
       - name: Run benchmark
@@ -175,6 +176,25 @@ jobs:
             --timeout=120 \
             --build-timeout=300 \
             --out="results/shards/${{ matrix.bench }}.json"
+
+      - name: Require jz-native parity and measurements
+        if: (matrix.bench == '00-noop.ts' || matrix.bench == '10-fib.ts') && (inputs.runners == '' || inputs.runners == 'all' || contains(inputs.runners, 'jz-native'))
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const bench = process.env.BENCH;
+          const data = JSON.parse(readFileSync(`results/shards/${bench}.json`, "utf8"));
+          const result = data.benches[bench]?.runners["jz-native"];
+          assert.ok(result, `${bench}: jz-native did not run`);
+          assert.equal(result.status, "ok", `${bench}: ${result.error}`);
+          assert.equal(result.matchesReference, true, `${bench}: native RESULT differs from Node`);
+          assert.ok(result.binBytes > 0, `${bench}: no standalone binary size`);
+          assert.ok(result.maxRssKb > 0, `${bench}: missing RSS measurement`);
+          assert.ok(result.time?.runs > 0, `${bench}: no timing runs`);
+          NODE
+        env:
+          BENCH: ${{ matrix.bench }}
 
       # Upload even when a runner takes the job down: the shard is written
       # incrementally, so partial results are still worth keeping.

@@ -36,6 +36,24 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
       - run: npm test
 
+  jz-native-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: latest
+      - name: Install native toolchain build requirements
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends clang cmake ninja-build
+      - run: npm ci
+      - name: Prepare pinned jz and WABT sources
+        run: ./scripts/setup-jz-native.sh
+      - name: Compile standalone numeric fixtures and compare output
+        run: node harness/jz-native-smoke.mjs
+
   perry-memory:
     runs-on: ubuntu-latest
     timeout-minutes: 15
