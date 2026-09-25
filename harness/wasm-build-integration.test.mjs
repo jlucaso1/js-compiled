@@ -37,6 +37,7 @@ test("js2wasm manifest compile command reproduces the emitted module", { skip: !
     assert.equal(built.status, 0, built.stderr || built.stdout);
     const manifest = JSON.parse(readFileSync(`${artifact}.manifest.json`, "utf8"));
     const [command, ...args] = manifest.compileCommand;
+    mkdirSync(`${artifact}.js2-output`);
     const replay = spawnSync(command, args, { cwd: dir, env, encoding: "utf8", timeout: 120000 });
     assert.equal(replay.status, 0, replay.stderr || replay.stdout);
     assert.deepEqual(readFileSync(path.join(`${artifact}.js2-output`, "fixture.wasm")), readFileSync(artifact));
@@ -52,8 +53,8 @@ test("Wasmtime setup uses local scratch and cleans up after download failure", {
     mkdirSync(path.join(dir, "bin"));
     copyFileSync(path.join(ROOT, "scripts/setup-wasm.sh"), path.join(dir, "scripts/setup-wasm.sh"));
     writeFileSync(path.join(dir, "bin/curl"), `#!${process.execPath}
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "node:fs";
+import path from "node:path";
 const output = process.argv[process.argv.indexOf("-o") + 1];
 fs.writeFileSync("download-path.json", JSON.stringify(path.resolve(output)));
 fs.writeFileSync(output, "partial download");
