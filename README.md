@@ -70,6 +70,8 @@ The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixt
 
 Wasm timing and RSS cover the actual `wasmtime run` process, including cold module validation and host compilation. A `.wasm` file is not a self-contained ELF executable: reports show the module and pinned Wasmtime host sizes separately, and do not treat module size as the whole runtime distribution. Reports separate original and adapted passing coverage; adapted results do not count as direct TypeScript coverage.
 
+Hosted CI runs [`harness/wasm-deployment-smoke.mjs`](harness/wasm-deployment-smoke.mjs) to compare copied modules' stdout and exit status with Node in an isolated filesystem. It also checks that build-tree module paths are inaccessible. Deployment requires the pinned Wasmtime executable and its OS libraries, but no JS/TS sources, compiler, `node_modules`, or build-tree loader.
+
 When reusing `vendor/jz` or `vendor/wabt`, setup rejects staged or unstaged tracked changes before fetching or checking out that repository. Preserve any local edits elsewhere and restore the tracked files before retrying. Untracked build files are allowed.
 
 For a local Perry compiler or an older installation, set `PERRY_BIN` to its absolute executable path; the harness records its reported version. For example:
