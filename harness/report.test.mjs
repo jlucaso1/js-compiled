@@ -65,6 +65,8 @@ test("report distinguishes adapted Wasm input and excludes mismatches from every
     assert.doesNotMatch(nativeSize, /js2wasm|assemblyscript/);
     assert.match(markdown, /output differs/);
     assert.match(page, /Wasm\/WASI input provenance/);
+    assert.match(page, /Metric rankings include successful runs not flagged as differing from Node's RESULT, regardless of input mode/);
+    assert.doesNotMatch(page, /Only Wasm runs with the matching source are eligible/);
     assert.match(page, /not a self-contained Wasm executable/);
   } finally {
     rmSync(dir, { recursive: true, force: true });

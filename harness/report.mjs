@@ -178,7 +178,7 @@ const wasmInputRows = benches.flatMap((b) => runners.filter((r) => rec(b, r)?.ar
   return `<tr><th scope="row">${esc(shortName(b))}</th><td>${esc(r)}</td><td>${esc(x.sourceMode ?? "not built")}</td><td class="l"><code>${esc(x.sourcePath ?? "-")}</code></td><td class="l"><code>${esc(x.generatedPath ?? "-")}</code></td><td>${esc(x.adaptation?.version ?? "direct input")}</td><td class="l"><code>${esc(x.sourceSha256 ?? "-")}</code></td><td class="l"><code>${esc(x.generatedSha256 ?? "-")}</code></td></tr>`;
 })).join("");
 const wasmInputSection = wasmInputRows ? `<section><h2>Wasm/WASI input provenance</h2>
-<p class="note"><code>original</code> means the canonical fixture was compiled directly. <code>adapted</code> means a bounded generated input was used; adapted coverage is not direct TypeScript coverage. Only Wasm runs with the matching source are eligible for metric rankings.</p>
+<p class="note"><code>original</code> means the canonical fixture was compiled directly. <code>adapted</code> means a bounded generated input was used; adapted coverage is not direct TypeScript coverage. Metric rankings include successful runs not flagged as differing from Node's RESULT, regardless of input mode; original and adapted inputs are identified separately above.</p>
 <div class="scroll"><table><thead><tr><th>bench</th><th>runner</th><th>input</th><th>source</th><th>generated input</th><th>adapter</th><th>source SHA-256</th><th>generated SHA-256</th></tr></thead><tbody>${wasmInputRows}</tbody></table></div></section>` : "";
 
 const versionRows = runners.map((r) => `<tr><th scope="row">${esc(r)}</th><td class="l">${esc(benches.map((b) => rec(b, r)?.version).find(Boolean) ?? "-")}</td></tr>`).join("");
