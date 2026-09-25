@@ -12,9 +12,14 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@assemblyscript/wasi-shim": "0.1.0",
     "@geastack/compiler": "1.0.18",
+    "@loopdive/js2": "0.71.0",
     "@perryts/perry": "0.5.1520",
-    "scriptc": "0.1.4"
+    "assemblyscript": "0.28.20",
+    "binaryen": "132.0.0",
+    "scriptc": "0.1.4",
+    "typescript": "5.9.3"
   },
   "overrides": {
     "@scriptc/llvm-darwin-x64": "0.1.0",

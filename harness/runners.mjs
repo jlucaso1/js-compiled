@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { WASMTIME, makeWasmtimeCommand, wasmtimeBytes, wasmtimeVersion } from "./wasm-toolchain.mjs";
 
 export const ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
@@ -72,6 +73,39 @@ export const RUNNERS = {
     mode: "compiled",
     version: [PERRY, "--version"],
     compile: (file, out) => [PERRY, "compile", file, "-o", out],
+  },
+
+  js2wasm: {
+    label: "js2wasm → WasmGC/WASI + Wasmtime",
+    tier: "extra",
+    mode: "compiled",
+    artifactKind: "wasm",
+    artifactExtension: ".wasm",
+    unsupportedBuildMarker: "UNSUPPORTED:",
+    requires: BIN("js2wasm"),
+    sourcePolicy: "original",
+    version: [process.execPath, path.join(ROOT, "harness", "wasm-version.mjs"), "js2wasm"],
+    compile: (file, out) => [process.execPath, path.join(ROOT, "harness", "js2wasm-build.mjs"), file, out],
+    runArtifact: (file) => makeWasmtimeCommand(file, "js2wasm"),
+    hostBytes: wasmtimeBytes,
+    hostExecutable: WASMTIME,
+  },
+
+  assemblyscript: {
+    label: "AssemblyScript → WASI + Wasmtime",
+    tier: "extra",
+    mode: "compiled",
+    artifactKind: "wasm",
+    artifactExtension: ".wasm",
+    unsupportedBuildMarker: "UNSUPPORTED:",
+    requires: path.join(ROOT, "node_modules", "assemblyscript", "package.json"),
+    sourcePolicy: "original-or-restricted-adaptation",
+    version: [process.execPath, path.join(ROOT, "harness", "wasm-version.mjs"), "assemblyscript"],
+    supports: (bench) => bench.endsWith(".ts") ? null : "AssemblyScript runner accepts the canonical TypeScript fixtures only",
+    compile: (file, out) => [process.execPath, path.join(ROOT, "harness", "assemblyscript-build.mjs"), file, out],
+    runArtifact: (file) => makeWasmtimeCommand(file, "assemblyscript"),
+    hostBytes: wasmtimeBytes,
+    hostExecutable: WASMTIME,
   },
 
   "jz-native": {
@@ -173,6 +207,15 @@ export function missingDependency(name) {
   const r = RUNNERS[name];
   if (r.requires && !existsSync(r.requires)) return r.requires;
   if (name === "geatsc" && !commandExists(CXX)) return `${CXX} (C++20 compiler; set CXX)`;
+  if (name === "js2wasm" || name === "assemblyscript") {
+    if (process.platform !== "linux" || process.arch !== "x64") return "pinned Wasmtime bundle is available only for Linux x86_64";
+    if (!existsSync(WASMTIME)) return `${WASMTIME} (run scripts/setup-wasm.sh)`;
+    try { wasmtimeVersion(); } catch (error) { return `unverified pinned Wasmtime: ${error.message}`; }
+    if (name === "js2wasm" && !existsSync(BIN("wasm-opt"))) return `${BIN("wasm-opt")} (pinned Binaryen required for -O3)`;
+    if (name === "assemblyscript" && !existsSync(path.join(ROOT, "node_modules", "@assemblyscript", "wasi-shim", "assembly"))) {
+      return "@assemblyscript/wasi-shim (run npm ci)";
+    }
+  }
   if (name === "jz-native") {
     const wasm2c = path.join(ROOT, "vendor", "wabt", "build", "wasm2c");
     if (!existsSync(wasm2c)) return `${wasm2c} (run scripts/setup-jz-native.sh)`;

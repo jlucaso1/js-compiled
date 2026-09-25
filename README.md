@@ -1,9 +1,10 @@
 # js-compiled
 
-Benchmarks JavaScript/TypeScript runtimes that execute directly against compilers
-that produce a native binary, on five axes: **execution time**, **peak memory**,
-**binary size**, **compile time**, and **coverage** — how much real JS/TS each
-compiler actually accepts.
+Benchmarks JavaScript/TypeScript runtimes and ahead-of-time compilers across five
+axes: **execution time**, **peak memory**, **artifact size**, **compile time**, and
+**coverage** — how much real JS/TS each compiler actually accepts. Compilers may
+target native executables or Wasm modules; measurements include the host needed
+to execute each artifact.
 
 Results are produced entirely by GitHub Actions and published to GitHub Pages.
 
@@ -31,6 +32,8 @@ Extras, enabled with `--runners=all`:
 | `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine (requires Deno 2.9.5 or later) |
 | `deno` | Deno executing directly |
 | `jz-native` | [jz](https://jz.js.org/) → WebAssembly → WABT `wasm2c` → `clang -O3`, standalone native executable; source revisions pinned in `scripts/setup-jz-native.sh` |
+| `js2wasm` | [loopdive/js2](https://github.com/loopdive/js2) → WasmGC/WASI, executed by pinned Wasmtime |
+| `assemblyscript` | AssemblyScript → Wasm/WASI with its incremental runtime and WASI shim, executed by pinned Wasmtime |
 
 `bun-compile` and `deno-compile` (including `deno-compile-quickjs`) produce "a binary", but they are not AOT
 compilers: they embed the whole runtime. They are here to anchor the binary-size
@@ -45,7 +48,7 @@ are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibili
 
 ```sh
 npm ci
-./scripts/setup.sh                 # vendors Porffor, Static Hermes, QuickJS-ng, and pinned jz/WABT
+./scripts/setup.sh                 # vendors native tools, pinned jz/WABT, and Wasmtime 49.0.1
 
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the six core candidates, 5 runs each
@@ -57,11 +60,15 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources; `npm run setup` installs the pinned toolchain. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+Requires Node 24+, `clang` (scriptc, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm runners are pinned to `@loopdive/js2` 0.71.0, AssemblyScript 0.28.20, `@assemblyscript/wasi-shim` 0.1.0, TypeScript 5.9.3, and js2wasm Binaryen 132.0.0 (AssemblyScript retains its separately locked Binaryen 131.0.0 nightly dependency). `scripts/setup-wasm.sh` verifies the SHA-256 of the official Wasmtime 49.0.1 Linux x86_64 release before installing it. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
 Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
 
 The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
+
+`js2wasm` compiles the canonical fixture directly for WASI and runs the module in Wasmtime with WasmGC features enabled. AssemblyScript is attempted directly on the original `.ts` fixtures; only `10-fib.ts` has a narrowly scoped AST-generated output adaptation, guarded by a numeric type check and a runtime safe-integer assertion. The canonical files in `benches/` are never rewritten. Every Wasm result records whether its input was `original` or `adapted`, with source/generated hashes and adapter rules. Unsupported adaptation is a distinct status, not a passing compile.
+
+Wasm timing and RSS cover the actual `wasmtime run` process, including cold module validation and host compilation. A `.wasm` file is not a self-contained ELF executable: reports show the module and pinned Wasmtime host sizes separately, and do not treat module size as the whole runtime distribution. Both Wasm candidates are in `--runners=all`, not the core default set.
 
 When reusing `vendor/jz` or `vendor/wabt`, setup rejects staged or unstaged tracked changes before fetching or checking out that repository. Preserve any local edits elsewhere and restore the tracked files before retrying. Untracked build files are allowed.
 
@@ -152,12 +159,14 @@ HTTP throughput, startup under I/O load, container image size, energy use.
 
 ```
 benches/              benchmark programs
-harness/runners.mjs   how each runner compiles and executes
-harness/exec.mjs      timing and RSS measurement
-harness/run.mjs       orchestration, writes the result JSON
-harness/merge.mjs     merges CI shards into one result file
-harness/report.mjs    result JSON -> REPORT.md + site/index.html
-scripts/setup.sh      toolchain setup, see Usage
+harness/runners.mjs               how each runner compiles and executes
+harness/exec.mjs                  timing and RSS measurement
+harness/run.mjs                   orchestration, writes the result JSON
+harness/assemblyscript-source.mjs restricted AST-based output adaptation
+harness/merge.mjs                 merges compatible CI shards into one result file
+harness/report.mjs                result JSON -> REPORT.md + site/index.html
+scripts/setup.sh                  toolchain setup, see Usage
+scripts/setup-wasm.sh             checksum-verifies the pinned Wasmtime host
 ```
 
 ## License

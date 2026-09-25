@@ -135,3 +135,8 @@ done
 # jz's native lane needs a commit-pinned compiler source and WABT's wasm2c
 # runtime. Hosted CI provisions clang/cmake/ninja before invoking this setup.
 ./scripts/setup-jz-native.sh
+if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
+  ./scripts/setup-wasm.sh
+else
+  echo "wasmtime 49.0.1 setup skipped: pinned bundle currently supports Linux x86_64 only"
+fi

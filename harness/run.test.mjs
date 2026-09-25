@@ -26,9 +26,10 @@ async function fixture({ phase = "none", runners = "perry", warmup = 0, output =
   try {
     mkdirSync(path.join(dir, "harness"));
     mkdirSync(path.join(dir, "benches"));
-    for (const file of ["run.mjs", "exec.mjs", "runners.mjs", "report.mjs"]) {
+    for (const file of ["run.mjs", "exec.mjs", "runners.mjs", "report.mjs", "wasm-toolchain.mjs"]) {
       copyFileSync(path.join(import.meta.dirname, file), path.join(dir, "harness", file));
     }
+    copyFileSync(path.join(import.meta.dirname, "..", "package-lock.json"), path.join(dir, "package-lock.json"));
     writeFileSync(path.join(dir, "benches", "test.ts"), 'console.log("RESULT 7");\n');
     const compiler = path.join(dir, "compiler.mjs");
     writeFileSync(compiler, `#!${process.execPath}
