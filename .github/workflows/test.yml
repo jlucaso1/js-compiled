@@ -162,6 +162,8 @@ jobs:
             assert.equal(data.benches[bench].runners.js2wasm.sourceMode, "original");
           }
           NODE
+      - name: Verify Wasm deployment without the build tree
+        run: node harness/wasm-deployment-smoke.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
