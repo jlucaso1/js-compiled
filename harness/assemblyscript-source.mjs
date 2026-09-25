@@ -2,13 +2,6 @@ import ts from "typescript";
 
 export const ADAPTER_VERSION = "assemblyscript-result-v1";
 
-export function formatSafeIntegerResult(value) {
-  if (!Number.isFinite(value) || !Number.isInteger(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) {
-    throw new RangeError("RESULT adaptation requires a finite safe integer");
-  }
-  return BigInt(value).toString();
-}
-
 function sourceAst(source, fileName) {
   const ast = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   if (ast.parseDiagnostics.length) {

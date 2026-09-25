@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { WASI } from "node:wasi";
+import asc from "assemblyscript/asc";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { adaptAssemblyScriptSource, formatSafeIntegerResult } from "./assemblyscript-source.mjs";
+import { adaptAssemblyScriptSource } from "./assemblyscript-source.mjs";
 
 function withSource(source, callback) {
   const dir = mkdtempSync(path.join(tmpdir(), "as-source-adapter-"));
@@ -67,13 +70,72 @@ test("adapter chooses a collision-free generated helper name", () => {
   });
 });
 
-test("safe integer result formatting preserves JS integer spelling and rejects unsafe values", () => {
-  assert.equal(formatSafeIntegerResult(0), "0");
-  assert.equal(formatSafeIntegerResult(-0), "0");
-  assert.equal(formatSafeIntegerResult(-7), "-7");
-  assert.equal(formatSafeIntegerResult(Number.MAX_SAFE_INTEGER), "9007199254740991");
-  assert.equal(formatSafeIntegerResult(Number.MIN_SAFE_INTEGER), "-9007199254740991");
-  for (const value of [1.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1, Number.MIN_SAFE_INTEGER - 1]) {
-    assert.throws(() => formatSafeIntegerResult(value), RangeError, `expected rejection for ${value}`);
+async function executeAdaptedSource(source) {
+  const root = path.resolve(import.meta.dirname, "..");
+  const build = path.join(root, "build");
+  mkdirSync(build, { recursive: true });
+  const dir = mkdtempSync(path.join(build, "as-formatter-test-"));
+  const descriptors = [];
+  try {
+    const file = path.join(dir, "fixture.ts");
+    writeFileSync(file, source);
+    const adapted = adaptAssemblyScriptSource(source, file);
+    const generated = path.join(dir, "generated.ts");
+    const wasm = path.join(dir, "fixture.wasm");
+    writeFileSync(generated, adapted.source);
+    const compiled = await asc.main([
+      generated,
+      "--baseDir", root,
+      "--lib", "./node_modules/@assemblyscript/wasi-shim/assembly",
+      "--use", "ASC_WASI=1", "--use", "console=wasi_console",
+      "--use", "abort=wasi_abort", "--use", "trace=wasi_trace",
+      "--use", "seed=wasi_seed", "--exportStart", "_start",
+      "--runtime", "incremental", "-O3", "-o", wasm,
+    ]);
+    assert.equal(compiled.error, null, compiled.stderr.toString());
+    const stdoutPath = path.join(dir, "stdout");
+    const stderrPath = path.join(dir, "stderr");
+    const stdout = openSync(stdoutPath, "w+");
+    descriptors.push(stdout);
+    const stderr = openSync(stderrPath, "w+");
+    descriptors.push(stderr);
+    const wasi = new WASI({ version: "preview1", returnOnExit: true, stdout, stderr });
+    const { instance } = await WebAssembly.instantiate(readFileSync(wasm), {
+      wasi_snapshot_preview1: wasi.wasiImport,
+    });
+    const status = wasi.start(instance);
+    return { status, stdout: readFileSync(stdoutPath, "utf8"), stderr: readFileSync(stderrPath, "utf8") };
+  } finally {
+    for (const descriptor of descriptors) closeSync(descriptor);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("generated AssemblyScript formatter preserves canonical Fibonacci parity", async () => {
+  const file = path.resolve(import.meta.dirname, "../benches/10-fib.ts");
+  const source = readFileSync(file, "utf8");
+  const expected = execFileSync(process.execPath, [file], { encoding: "utf8" });
+  const result = await executeAdaptedSource(source);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, expected);
+  assert.equal(result.stderr, "");
+});
+
+test("generated AssemblyScript formatter preserves JS safe integer spelling", async () => {
+  for (const literal of ["0", "-0", "-7", "9007199254740991", "-9007199254740991"]) {
+    const source = `let value: number = ${literal};\nconsole.log("RESULT " + value);\n`;
+    const result = await executeAdaptedSource(source);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, `RESULT ${Number(literal)}\n`, literal);
+    assert.equal(result.stderr, "");
+  }
+});
+
+test("generated AssemblyScript formatter rejects non-finite and non-safe integers", async () => {
+  for (const literal of ["1.5", "NaN", "Infinity", "-Infinity", "9007199254740992", "-9007199254740992"]) {
+    const source = `let value: number = ${literal};\nconsole.log("RESULT " + value);\n`;
+    const result = await executeAdaptedSource(source);
+    assert.equal(result.status, 255, `${literal}: ${result.stderr}`);
+    assert.equal(result.stdout, "", literal);
   }
 });
