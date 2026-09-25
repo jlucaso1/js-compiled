@@ -16,15 +16,12 @@ function withSource(source, callback) {
   finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-test("AST adapter preserves canonical bytes and evaluates one statically numeric RESULT expression once", () => {
+test("AST adapter preserves the source file and generated prefix byte contracts", () => {
   const source = "let acc: number = 5;\nacc += 3;\nconsole.log(\"RESULT \" + acc);\n";
   withSource(source, (file) => {
     const adapted = adaptAssemblyScriptSource(source, file);
     assert.equal(readFileSync(file, "utf8"), source);
     assert.equal(adapted.source.slice(0, adapted.source.indexOf("__assemblyscriptResultAdapter(")), "let acc: number = 5;\nacc += 3;\n");
-    assert.equal((adapted.source.match(/__assemblyscriptResultAdapter\(acc\)/g) ?? []).length, 1);
-    assert.match(adapted.source, /assert\(isFinite\(value\).*9007199254740991/);
-    assert.match(adapted.source, /i64\(value\)\.toString\(\)/);
     assert.deepEqual(adapted.rules, [
       "replace only the final RESULT concatenation with a single helper call",
       "require TypeScript checker to infer a numeric result",
@@ -47,30 +44,36 @@ test("AST adapter rejects malformed output, shadowed console, and unknown/non-nu
   }
 });
 
-test("generated adaptation changes with benchmark source rather than a baked result", () => {
-  const first = "let value: number = 11;\nconsole.log(\"RESULT \" + value);\n";
-  const changed = "let value: number = 12;\nconsole.log(\"RESULT \" + value);\n";
-  withSource(first, (file) => {
-    const one = adaptAssemblyScriptSource(first, file).source;
-    writeFileSync(file, changed);
-    const two = adaptAssemblyScriptSource(changed, file).source;
-    assert.notEqual(one, two);
-    assert.match(one, /value: number = 11/);
-    assert.match(two, /value: number = 12/);
-    assert.doesNotMatch(two, /RESULT 12/);
-  });
+test("generated adapter evaluates a side-effecting RESULT expression exactly once", async () => {
+  const source = `let calls: number = 0;
+function next(): number { calls++; return calls; }
+console.log("RESULT " + next());
+`;
+  const result = await executeAdaptedSource(source, "assert(calls == 1);");
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "RESULT 1\n");
 });
 
-test("adapter chooses a collision-free generated helper name", () => {
-  const source = "let __assemblyscriptResultAdapter: number = 1;\nconsole.log(\"RESULT \" + __assemblyscriptResultAdapter);\n";
-  withSource(source, (file) => {
-    const adapted = adaptAssemblyScriptSource(source, file);
-    assert.equal(adapted.helperName, "__assemblyscriptResultAdapter1");
-    assert.match(adapted.source, /__assemblyscriptResultAdapter1\(__assemblyscriptResultAdapter\)/);
-  });
+test("generated adaptation executes changed benchmark values", async () => {
+  for (const value of [11, 12]) {
+    const source = `let value: number = ${value};\nconsole.log("RESULT " + value);\n`;
+    const result = await executeAdaptedSource(source);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, `RESULT ${value}\n`);
+  }
 });
 
-async function executeAdaptedSource(source) {
+test("adapter executes with colliding generated helper identifiers", async () => {
+  const source = `let __assemblyscriptResultAdapter: number = 1;
+let __assemblyscriptResultAdapter1: number = 2;
+console.log("RESULT " + (__assemblyscriptResultAdapter + __assemblyscriptResultAdapter1));
+`;
+  const result = await executeAdaptedSource(source);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "RESULT 3\n");
+});
+
+async function executeAdaptedSource(source, after = "") {
   const root = path.resolve(import.meta.dirname, "..");
   const build = path.join(root, "build");
   mkdirSync(build, { recursive: true });
@@ -82,7 +85,7 @@ async function executeAdaptedSource(source) {
     const adapted = adaptAssemblyScriptSource(source, file);
     const generated = path.join(dir, "generated.ts");
     const wasm = path.join(dir, "fixture.wasm");
-    writeFileSync(generated, adapted.source);
+    writeFileSync(generated, adapted.source + after);
     const compiled = await asc.main([
       generated,
       "--baseDir", root,

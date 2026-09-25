@@ -36,7 +36,8 @@ const statusOf = (x) => {
 };
 
 const columnsFor = (m) => {
-  if (m.key === "binary" || m.key === "build") return runners.filter((r) => benches.some((b) => rec(b, r)?.mode === "compiled" && rec(b, r)?.artifactKind !== "wasm"));
+  if (m.key === "build") return runners.filter((r) => benches.some((b) => rec(b, r)?.mode === "compiled"));
+  if (m.key === "binary") return runners.filter((r) => benches.some((b) => rec(b, r)?.mode === "compiled" && rec(b, r)?.artifactKind !== "wasm"));
   if (m.key === "module" || m.key === "host") return runners.filter((r) => benches.some((b) => rec(b, r)?.artifactKind === "wasm"));
   return runners;
 };

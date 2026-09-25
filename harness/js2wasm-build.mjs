@@ -85,7 +85,7 @@ const manifest = {
   sourceSha256: hash(sourceText),
   generatedSha256: null,
   adaptation: null,
-  compileCommand: ["js2wasm", ...args.slice(1)],
+  compileCommand: ["js2wasm", ...args],
   optimization: { requested: "-O3", binaryen: optText, warningScanPassed: true },
   toolchain: metadata,
 };

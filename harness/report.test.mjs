@@ -54,6 +54,15 @@ test("report distinguishes adapted Wasm input and excludes mismatches from every
     assert.match(timing, /\| test\s+\|[^\n]*\s-\s+\|[^\n]*2\.00/);
     const moduleSize = markdown.split("## Wasm module size")[1].split("## Wasm host executable size")[0];
     assert.match(moduleSize, /\| test\s+\|\s+-\s+\|\s+\*\*0\.001\*\*/);
+    const compileTime = markdown.split("## Compile time")[1].split("## Speedup")[0];
+    assert.match(compileTime, /\| bench\s+\| js2wasm\s+\| assemblyscript\s+\|/);
+    assert.match(compileTime, /\| test\s+\|\s+-\s+\|\s+\*\*0\.01\*\*/);
+    const compilePage = page.split("<h2>Compile time")[1].split("</section>")[0];
+    assert.match(compilePage, /<th scope="col">js2wasm<\/th><th scope="col">assemblyscript<\/th>/);
+    assert.match(compilePage, /<td class="empty"[^>]*>&mdash;<\/td>/);
+    assert.match(compilePage, /<span class="v">0\.01<\/span>/);
+    const nativeSize = markdown.split("## Native executable size")[1].split("## Wasm module size")[0];
+    assert.doesNotMatch(nativeSize, /js2wasm|assemblyscript/);
     assert.match(markdown, /output differs/);
     assert.match(page, /Wasm\/WASI input provenance/);
     assert.match(page, /not a self-contained Wasm executable/);

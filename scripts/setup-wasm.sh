@@ -20,7 +20,8 @@ if [ -x "$DEST" ] && [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$SHA256" ] && "
   exit 0
 fi
 
-TMP="$(mktemp -d)"
+mkdir -p build/.cache
+TMP="$(mktemp -d build/.cache/wasmtime.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 curl -fL --retry 3 "$URL" -o "$TMP/$ASSET"
 echo "${SHA256}  $TMP/$ASSET" | sha256sum --check --status || {

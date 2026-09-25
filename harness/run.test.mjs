@@ -57,7 +57,7 @@ if (phase === "build") { console.error(${JSON.stringify(buildError)}); process.e
     const report = spawnSync(process.execPath, [path.join(dir, "harness", "report.mjs")], { cwd: dir, encoding: "utf8" });
     assert.equal(report.status, 0, report.stderr);
     const markdown = readFileSync(path.join(dir, "results", "REPORT.md"), "utf8");
-    return { result: results.benches["test.ts"].runners.perry, reference: results.benches["test.ts"].reference, log, markdown };
+    return { runners: results.benches["test.ts"].runners, result: results.benches["test.ts"].runners.perry, reference: results.benches["test.ts"].reference, log, markdown };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -100,3 +100,13 @@ for (const runners of ["perry", "perry,node"]) {
     assert.match(timing, /^\| test\s*\|.*\s-\s*\|$/m, "mismatched Perry result must not appear as a timing win");
   });
 }
+
+test("Node runs first while unavailable selected runners remain recorded", { skip: !supported }, async () => {
+  const { result, reference, runners } = await fixture({ runners: "js2wasm,perry,node" });
+  assert.equal(result.status, "ok");
+  assert.equal(result.matchesReference, true);
+  assert.equal(result.time.runs, 1);
+  assert.equal(reference.output, "7");
+  assert.equal(runners.js2wasm.status, "unavailable");
+  assert.deepEqual(Object.keys(runners), ["node", "js2wasm", "perry"]);
+});

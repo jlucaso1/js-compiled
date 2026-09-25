@@ -93,10 +93,11 @@ for (const name of opts.runners) {
   } else active.push(name);
 }
 // A selected runner must never become its own correctness oracle.
-const nodeIndex = active.indexOf("node");
+const selected = [...opts.runners];
+const nodeIndex = selected.indexOf("node");
 if (nodeIndex > 0) {
-  active.splice(nodeIndex, 1);
-  active.unshift("node");
+  selected.splice(nodeIndex, 1);
+  selected.unshift("node");
 }
 
 // Backstop for the RSS watchdog: children inherit oom_score_adj, so if a runner
@@ -307,7 +308,7 @@ for (const bench of benches) {
     entry.reference = { version: referenceVersion, output: reference };
   }
 
-  for (const name of opts.runners) {
+  for (const name of selected) {
     const runner = RUNNERS[name];
     const rec = {
       mode: runner.mode,
