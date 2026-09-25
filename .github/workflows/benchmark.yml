@@ -77,16 +77,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
       - name: Install build tools
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == ''
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == '' || hashFiles('vendor/wasmtime/wasmtime') == '' || hashFiles('vendor/wasmtime/.archive_sha256') == ''
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ cmake ninja-build libicu-dev
 
       - name: Setup vendored toolchains
-        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == ''
+        if: steps.cache-vendor.outputs.cache-hit != 'true' || hashFiles('vendor/hermes/build/bin/shermes') == '' || hashFiles('vendor/quickjs/build/qjs') == '' || hashFiles('vendor/wabt/build/wasm2c') == '' || hashFiles('vendor/jz/node_modules/watr/package.json') == '' || hashFiles('vendor/wasmtime/wasmtime') == '' || hashFiles('vendor/wasmtime/.archive_sha256') == ''
         run: |
           npm ci
           ./scripts/setup.sh
@@ -164,6 +164,8 @@ jobs:
           vendor/hermes/build/bin/shermes -version 2>/dev/null | grep -i "Static Hermes" || true
           vendor/quickjs/build/qjs -v 2>/dev/null || qjs -v 2>/dev/null || true
           vendor/wabt/build/wasm2c --version
+          node harness/wasm-version.mjs js2wasm
+          node harness/wasm-version.mjs assemblyscript
           node harness/run.mjs --list
 
       - name: Run benchmark
@@ -176,6 +178,33 @@ jobs:
             --timeout=120 \
             --build-timeout=300 \
             --out="results/shards/${{ matrix.bench }}.json"
+
+      - name: Require full Wasm runner coverage and measurements
+        if: inputs.runners == '' || inputs.runners == 'all' || contains(inputs.runners, 'js2wasm') || contains(inputs.runners, 'assemblyscript')
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const bench = process.env.BENCH;
+          const data = JSON.parse(readFileSync(`results/shards/${bench}.json`, "utf8"));
+          const selected = process.env.RUNNERS;
+          for (const runner of ["js2wasm", "assemblyscript"]) {
+            if (selected !== "all" && selected && !selected.split(",").includes(runner)) continue;
+            const result = data.benches[bench]?.runners[runner];
+            assert.ok(result, `${bench}: ${runner} was not attempted`);
+            assert.ok(["ok", "unsupported", "unavailable", "build-failed", "run-failed", "timeout", "out-of-memory", "reference-failed"].includes(result.status), `${bench}/${runner}: unknown status ${result.status}`);
+            if (result.status === "ok" && result.matchesReference === true) {
+              assert.ok(result.moduleBytes > 0, `${bench}/${runner}: missing Wasm module size`);
+              assert.ok(result.hostBytes > 0, `${bench}/${runner}: missing pinned Wasmtime host size`);
+              assert.ok(result.maxRssKb > 0, `${bench}/${runner}: missing Wasmtime RSS measurement`);
+              assert.ok(result.time?.runs > 0, `${bench}/${runner}: no timed Wasmtime samples`);
+              assert.ok(result.runtimeCommand?.[0]?.endsWith("/vendor/wasmtime/wasmtime"), `${bench}/${runner}: not executed by pinned Wasmtime`);
+            }
+          }
+          NODE
+        env:
+          BENCH: ${{ matrix.bench }}
+          RUNNERS: ${{ inputs.runners || 'all' }}
 
       - name: Require jz-native parity and measurements
         if: (matrix.bench == '00-noop.ts' || matrix.bench == '10-fib.ts') && (inputs.runners == '' || inputs.runners == 'all' || contains(inputs.runners, 'jz-native'))

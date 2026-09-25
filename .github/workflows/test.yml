@@ -7,12 +7,14 @@ on:
       - package.json
       - package-lock.json
       - .github/workflows/test.yml
+      - scripts/**
   pull_request:
     paths:
       - harness/**
       - package.json
       - package-lock.json
       - .github/workflows/test.yml
+      - scripts/**
 
 permissions:
   contents: read
@@ -23,7 +25,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -34,6 +36,7 @@ jobs:
       - name: Install GNU time for Linux RSS tests
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
+      - run: npm ci
       - run: npm test
 
   jz-native-smoke:
@@ -91,3 +94,78 @@ jobs:
         with:
           name: perry-memory-linux
           path: results/perry-memory.json
+
+  wasm-wasi-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: latest
+          cache: npm
+      - name: Install GNU time for RSS measurements
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
+      - run: npm ci
+      - name: Install and verify pinned Wasmtime
+        run: ./scripts/setup-wasm.sh
+      - name: Confirm original AssemblyScript Fibonacci remains unsupported
+        run: |
+          mkdir -p build/as-negative
+          set +e
+          node_modules/.bin/asc benches/10-fib.ts \
+            --lib ./node_modules/@assemblyscript/wasi-shim/assembly \
+            --use ASC_WASI=1 --use console=wasi_console --use abort=wasi_abort \
+            --use trace=wasi_trace --use seed=wasi_seed --exportStart _start \
+            --runtime incremental -O3 -o build/as-negative/10-fib-original.wasm \
+            >build/as-negative/10-fib-original.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "AssemblyScript unexpectedly accepted the unadapted canonical Fibonacci fixture" >&2
+            exit 1
+          fi
+          grep -q 'TS2322' build/as-negative/10-fib-original.log
+      - name: Execute true Wasm/WASI smoke, parity, timing, and RSS checks
+        run: |
+          node harness/run.mjs --runners=node,js2wasm,assemblyscript \
+            --benches=00-noop,01-hello,10-fib --runs=2 --warmup=1 --rss-runs=2 \
+            --timeout=120 --build-timeout=300 --out=results/wasm-smoke.json
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const data = JSON.parse(readFileSync("results/wasm-smoke.json", "utf8"));
+          assert.equal(data.meta.wasmtimeHostVersion.includes("49.0.1"), true);
+          assert.equal(Object.keys(data.benches).length, 3);
+          for (const [bench, entry] of Object.entries(data.benches)) {
+            for (const runner of ["js2wasm", "assemblyscript"]) {
+              const result = entry.runners[runner];
+              assert.equal(result.status, "ok", `${bench}/${runner}: ${result.error}`);
+              assert.equal(result.matchesReference, true, `${bench}/${runner}: output differs from Node`);
+              assert.ok(result.moduleBytes > 0, `${bench}/${runner}: no Wasm module size`);
+              assert.ok(result.hostBytes > 0, `${bench}/${runner}: no Wasmtime host size`);
+              assert.ok(result.maxRssKb > 0, `${bench}/${runner}: no Wasmtime RSS`);
+              assert.equal(result.time.runs, 2, `${bench}/${runner}: expected two timed host-process samples`);
+              assert.ok(result.runtimeCommand[0].endsWith("/vendor/wasmtime/wasmtime"));
+            }
+          }
+          for (const bench of ["00-noop.ts", "01-hello.ts"]) {
+            assert.equal(data.benches[bench].runners.assemblyscript.sourceMode, "original");
+          }
+          const adapted = data.benches["10-fib.ts"].runners.assemblyscript;
+          assert.equal(adapted.sourceMode, "adapted");
+          assert.equal(adapted.adaptation.version, "assemblyscript-result-v1");
+          assert.ok(adapted.generatedSha256);
+          for (const bench of Object.keys(data.benches)) {
+            assert.equal(data.benches[bench].runners.js2wasm.sourceMode, "original");
+          }
+          NODE
+      - name: Verify Wasm deployment without the build tree
+        run: node harness/wasm-deployment-smoke.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: wasm-wasi-smoke
+          path: results/wasm-smoke.json

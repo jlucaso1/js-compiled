@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // Runs every (bench, runner) pair and writes a JSON result file.
 process.removeAllListeners("warning");
+import { createHash } from "node:crypto";
 import { readdirSync, statSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { stripTypeScriptTypes } from "node:module";
 import path from "node:path";
 import { RUNNERS, CORE, ROOT, missingDependency } from "./runners.mjs";
+import { wasmToolchainMetadata, wasmtimeVersion } from "./wasm-toolchain.mjs";
 import { timeRun, rssRun, stats } from "./exec.mjs";
 
 const BENCH_DIR = path.join(ROOT, "benches");
@@ -67,7 +69,7 @@ const benches = opts.benches ? allBenches.filter((f) => opts.benches.some((p) =>
 if (opts.list) {
   console.log("benches:\n  " + allBenches.join("\n  "));
   console.log("\nrunners:");
-  for (const [k, v] of Object.entries(RUNNERS)) console.log(`  ${k.padEnd(17)} ${v.mode.padEnd(12)} ${v.tier}`);
+  for (const [k, v] of Object.entries(RUNNERS)) console.log(`  ${k.padEnd(17)} ${v.mode.padEnd(12)} ${(v.artifactKind ?? "").padEnd(6)} ${v.tier}`);
   process.exit(0);
 }
 if (!benches.length) {
@@ -82,16 +84,20 @@ for (const n of opts.runners) {
 }
 
 const active = [];
+const unavailable = new Map();
 for (const name of opts.runners) {
   const missing = missingDependency(name);
-  if (missing) console.error(`skipping ${name}: missing ${missing} (run scripts/setup.sh)`);
-  else active.push(name);
+  if (missing) {
+    unavailable.set(name, missing);
+    console.error(`unavailable ${name}: missing ${missing} (run scripts/setup.sh)`);
+  } else active.push(name);
 }
 // A selected runner must never become its own correctness oracle.
-const nodeIndex = active.indexOf("node");
+const selected = [...opts.runners];
+const nodeIndex = selected.indexOf("node");
 if (nodeIndex > 0) {
-  active.splice(nodeIndex, 1);
-  active.unshift("node");
+  selected.splice(nodeIndex, 1);
+  selected.unshift("node");
 }
 
 // Backstop for the RSS watchdog: children inherit oom_score_adj, so if a runner
@@ -122,6 +128,9 @@ function failure(r, phase) {
 
 async function version(name) {
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
+  if (RUNNERS[name].artifactKind === "wasm" && !r.ok) {
+    throw new Error(`${name} toolchain version verification failed: ${firstLines(r.stderr || r.stdout) || r.spawnError || `exit ${r.exitCode}`}`);
+  }
   const lines = clean(r.stdout + r.stderr).trim().split("\n").map((l) => l.trim()).filter(Boolean);
   const matched = lines.find((l) => l.includes("Static Hermes"));
   return matched || lines[0] || "unknown";
@@ -141,17 +150,52 @@ function sourceFor(runner, bench) {
 async function build(name, runner, bench) {
   const outDir = path.join(BUILD_DIR, name);
   mkdirSync(outDir, { recursive: true });
-  const outPath = path.join(outDir, path.basename(bench).replace(/\.(ts|js)$/, ""));
+  const extension = runner.artifactExtension ?? "";
+  const outPath = path.join(outDir, path.basename(bench).replace(/\.(ts|js)$/, "") + extension);
+  const manifestPath = `${outPath}.manifest.json`;
   rmSync(outPath, { force: true });
+  rmSync(manifestPath, { force: true });
   const r = await timeRun(runner.compile(sourceFor(runner, bench), outPath), {
     cwd: BUILD_DIR,
     timeoutMs: opts.buildTimeout * 1000,
     memLimitKb: limitKb,
   });
   if (!r.ok || !existsSync(outPath)) {
-    return { ok: false, buildMs: r.wallMs, ...failure(r, "build") };
+    const unsupported = runner.unsupportedBuildMarker && `${r.stdout ?? ""}\n${r.stderr ?? ""}`.includes(runner.unsupportedBuildMarker);
+    const failed = failure(r, "build");
+    return {
+      ok: false,
+      buildMs: r.wallMs,
+      ...failed,
+      ...(unsupported ? { status: "unsupported", phase: "adapt", error: `${r.stderr ?? ""}`.trim().replace(/^UNSUPPORTED:\s*/, "") } : {}),
+    };
   }
-  return { ok: true, outPath, buildMs: r.wallMs, binBytes: statSync(outPath).size };
+  let manifest = null;
+  if (existsSync(manifestPath)) {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (path.resolve(ROOT, manifest.artifactPath) !== path.resolve(outPath)) {
+      return { ok: false, buildMs: r.wallMs, status: "build-failed", phase: "build", error: "build manifest artifact path does not match requested output" };
+    }
+    if (manifest.artifactBytes !== statSync(outPath).size) {
+      return { ok: false, buildMs: r.wallMs, status: "build-failed", phase: "build", error: "build manifest artifact size does not match emitted file" };
+    }
+    if (runner.artifactKind === "wasm") {
+      const host = manifest.runtimeDependencies?.find((dependency) => dependency.kind === "wasmtime-host");
+      if (!host || path.resolve(ROOT, host.path) !== path.resolve(runner.hostExecutable) || host.bytes !== runner.hostBytes() || !host.version?.includes(toolchains.wasmtime.version)) {
+        return { ok: false, buildMs: r.wallMs, status: "build-failed", phase: "build", error: "build manifest does not identify the pinned Wasmtime host and size" };
+      }
+    }
+  }
+  const bytes = statSync(outPath).size;
+  return {
+    ok: true,
+    outPath,
+    buildMs: r.wallMs,
+    manifest,
+    ...(runner.artifactKind === "wasm"
+      ? { moduleBytes: bytes, hostBytes: runner.hostBytes(), hostExecutable: runner.hostExecutable }
+      : { binBytes: bytes }),
+  };
 }
 
 function resultLine(stdout) {
@@ -168,6 +212,10 @@ mkdirSync(RESULT_DIR, { recursive: true });
 
 const versions = Object.fromEntries(await Promise.all(active.map(async (n) => [n, await version(n)])));
 const referenceVersion = versions.node ?? await version("node");
+const toolchains = wasmToolchainMetadata();
+const pinnedWasmtimeVersion = opts.runners.some((name) => RUNNERS[name].artifactKind === "wasm") && active.some((name) => RUNNERS[name].artifactKind === "wasm")
+  ? wasmtimeVersion()
+  : null;
 const porfforDir = path.join(ROOT, "vendor", "porffor");
 let porfforCommit = null;
 if (existsSync(path.join(porfforDir, ".git"))) {
@@ -233,6 +281,10 @@ const results = {
     commit: process.env.GITHUB_SHA ?? null,
     versions,
     referenceVersion,
+    toolchains,
+    wasmtimeHostVersion: pinnedWasmtimeVersion,
+    selectedRunners: opts.runners,
+    unavailableRunners: Object.fromEntries(unavailable),
     porfforCommit,
     hermesCommit,
     quickjsCommit,
@@ -259,11 +311,26 @@ for (const bench of benches) {
     entry.reference = { version: referenceVersion, output: reference };
   }
 
-  for (const name of active) {
+  for (const name of selected) {
     const runner = RUNNERS[name];
-    const rec = { mode: runner.mode, label: runner.label, version: versions[name], status: "ok" };
+    const rec = {
+      mode: runner.mode,
+      label: runner.label,
+      version: versions[name] ?? null,
+      artifactKind: runner.artifactKind ?? null,
+      sourcePolicy: runner.sourcePolicy ?? null,
+      sourceMode: null,
+      toolchain: runner.artifactKind === "wasm" ? toolchains : null,
+      status: "ok",
+    };
     entry.runners[name] = rec;
     process.stdout.write(`  ${name.padEnd(17)} `);
+    if (unavailable.has(name)) {
+      Object.assign(rec, { status: "unavailable", phase: "setup", error: unavailable.get(name) });
+      console.log(`UNAVAILABLE  ${rec.error}`);
+      flush();
+      continue;
+    }
     const unsupported = runner.supports?.(bench);
     if (unsupported) {
       Object.assign(rec, { status: "unsupported", error: unsupported });
@@ -275,16 +342,53 @@ for (const bench of benches) {
     let argv;
     let cwd = BUILD_DIR;
     if (runner.mode === "compiled") {
+      if (runner.artifactKind === "wasm") {
+        const canonicalSource = path.join(BENCH_DIR, bench);
+        rec.sourceMode = "original";
+        rec.sourcePath = path.relative(ROOT, canonicalSource);
+        rec.sourceSha256 = createHash("sha256").update(readFileSync(canonicalSource)).digest("hex");
+      }
       const b = await build(name, runner, bench);
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
+      rec.moduleBytes = b.moduleBytes ?? null;
+      rec.hostBytes = b.hostBytes ?? null;
+      rec.hostExecutable = b.hostExecutable ?? null;
       if (!b.ok) {
+        // Without a successful manifest, the attempted compiler input is unverified.
+        // In particular, AssemblyScript may have compiled a generated adaptation.
+        if (b.phase === "adapt") rec.sourceMode = "adaptation rejected";
+        else if (runner.artifactKind === "wasm" && runner.sourcePolicy !== "original") rec.sourceMode = null;
         Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
         console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();
         continue;
       }
-      argv = [b.outPath];
+      if (b.manifest) {
+        rec.sourceMode = b.manifest.sourceMode;
+        rec.artifactPath = b.manifest.artifactPath;
+        rec.target = b.manifest.target ?? null;
+        rec.wasmtimeFlags = b.manifest.wasmtimeFlags ?? [];
+        rec.wasmtimeCache = b.manifest.wasmtimeCache ?? null;
+        rec.runtime = b.manifest.runtime ?? null;
+        rec.moduleSha256 = b.manifest.artifactSha256;
+        rec.distributionFiles = b.manifest.distributionFiles ?? [];
+        rec.runtimeDependencies = b.manifest.runtimeDependencies ?? [];
+        rec.sourcePath = b.manifest.sourcePath;
+        rec.sourceSha256 = b.manifest.sourceSha256;
+        rec.generatedPath = b.manifest.generatedPath ?? null;
+        rec.generatedSha256 = b.manifest.generatedSha256 ?? null;
+        rec.adaptation = b.manifest.adaptation ?? null;
+        rec.compileCommand = b.manifest.compileCommand ?? null;
+        rec.optimization = b.manifest.optimization ?? null;
+      } else {
+        rec.sourceMode = runner.sourcePolicy === "original" ? "original" : null;
+      }
+      argv = runner.runArtifact ? runner.runArtifact(b.outPath) : [b.outPath];
+      if (runner.artifactKind === "wasm") {
+        cwd = ROOT;
+        rec.runtimeCommand = argv;
+      }
     } else {
       argv = runner.cmd(sourceFor(runner, bench));
       cwd = ROOT;
@@ -355,6 +459,7 @@ for (const bench of benches) {
         ` ±${t ? t.stddev.toFixed(1) : "?"}` +
         `   rss ${rec.maxRssKb ? (rec.maxRssKb / 1024).toFixed(1) + " MB" : "n/a"}` +
         (rec.binBytes ? `   bin ${(rec.binBytes / 1024).toFixed(0)} KB   build ${(rec.buildMs / 1000).toFixed(2)} s` : "") +
+        (rec.moduleBytes ? `   wasm ${(rec.moduleBytes / 1024).toFixed(1)} KB · host ${(rec.hostBytes / 1024 / 1024).toFixed(1)} MB   build ${(rec.buildMs / 1000).toFixed(2)} s` : "") +
         (rec.matchesReference === false ? "   OUTPUT MISMATCH" : ""),
     );
     if (rec.status !== "ok") console.log(`    ${rec.status.toUpperCase()} (${rec.phase}): ${rec.error}`);

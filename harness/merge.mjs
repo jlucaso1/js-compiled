@@ -21,6 +21,15 @@ if (!files.length) {
 }
 
 const shards = files.map((f) => JSON.parse(readFileSync(f, "utf8"))).sort((a, b) => a.meta.startedAt.localeCompare(b.meta.startedAt));
+const compatibilityKeys = ["commit", "versions", "referenceVersion", "toolchains", "opts", "selectedRunners", "wasmtimeHostVersion"];
+const stableMetadata = (meta) => JSON.stringify(Object.fromEntries(compatibilityKeys.map((key) => [key, meta[key] ?? null])));
+const baselineMetadata = stableMetadata(shards[0].meta);
+for (const shard of shards.slice(1)) {
+  if (stableMetadata(shard.meta) !== baselineMetadata) {
+    console.error(`incompatible shard toolchain/options metadata for benches ${Object.keys(shard.benches).join(", ")}`);
+    process.exit(1);
+  }
+}
 
 const merged = {
   meta: {
@@ -34,6 +43,13 @@ const merged = {
       cpuModel: s.meta.cpuModel,
       cpus: s.meta.cpus,
       spawnOverheadMs: s.meta.spawnOverheadMs?.median ?? null,
+      versions: s.meta.versions ?? {},
+      referenceVersion: s.meta.referenceVersion ?? null,
+      toolchains: s.meta.toolchains ?? null,
+      opts: s.meta.opts ?? null,
+      selectedRunners: s.meta.selectedRunners ?? null,
+      commit: s.meta.commit ?? null,
+      wasmtimeHostVersion: s.meta.wasmtimeHostVersion ?? null,
     })),
   },
   benches: {},
