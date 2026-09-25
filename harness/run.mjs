@@ -128,6 +128,9 @@ function failure(r, phase) {
 
 async function version(name) {
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
+  if (RUNNERS[name].artifactKind === "wasm" && !r.ok) {
+    throw new Error(`${name} toolchain version verification failed: ${firstLines(r.stderr || r.stdout) || r.spawnError || `exit ${r.exitCode}`}`);
+  }
   const lines = clean(r.stdout + r.stderr).trim().split("\n").map((l) => l.trim()).filter(Boolean);
   const matched = lines.find((l) => l.includes("Static Hermes"));
   return matched || lines[0] || "unknown";
@@ -352,7 +355,10 @@ for (const bench of benches) {
       rec.hostBytes = b.hostBytes ?? null;
       rec.hostExecutable = b.hostExecutable ?? null;
       if (!b.ok) {
+        // Without a successful manifest, the attempted compiler input is unverified.
+        // In particular, AssemblyScript may have compiled a generated adaptation.
         if (b.phase === "adapt") rec.sourceMode = "adaptation rejected";
+        else if (runner.artifactKind === "wasm" && runner.sourcePolicy !== "original") rec.sourceMode = null;
         Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
         console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();

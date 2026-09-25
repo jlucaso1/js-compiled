@@ -10,7 +10,7 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 function shard(bench, startedAt, versions = { node: "v24", js2wasm: "0.71.0" }) {
   return {
     meta: {
-      startedAt, finishedAt: startedAt, versions,
+      startedAt, finishedAt: startedAt, versions, referenceVersion: versions.node,
       toolchains: { wasmtime: { version: "49.0.1" } },
       opts: { runs: 2, warmup: 1, rssRuns: 2 },
       selectedRunners: ["node", "js2wasm"],
@@ -37,7 +37,28 @@ test("merge preserves per-shard toolchain/options metadata", () => {
     const merged = JSON.parse(readFileSync(output, "utf8"));
     assert.equal(merged.meta.shards.length, 2);
     assert.equal(merged.meta.shards[0].toolchains.wasmtime.version, "49.0.1");
+    assert.equal(merged.meta.shards[0].referenceVersion, "v24");
     assert.deepEqual(merged.meta.shards[0].opts, { runs: 2, warmup: 1, rssRuns: 2 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("merge rejects different hidden Node oracle versions", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "merge-oracle-"));
+  try {
+    const shards = path.join(dir, "shards");
+    mkdirSync(shards);
+    const a = shard("00-noop.ts", "2026-01-01T00:00:00.000Z", { js2wasm: "0.71.0" });
+    const b = shard("01-hello.ts", "2026-01-01T00:01:00.000Z", { js2wasm: "0.71.0" });
+    a.meta.referenceVersion = "v24.0.0";
+    b.meta.referenceVersion = "v26.0.0";
+    a.meta.selectedRunners = b.meta.selectedRunners = ["js2wasm"];
+    writeFileSync(path.join(shards, "a.json"), JSON.stringify(a));
+    writeFileSync(path.join(shards, "b.json"), JSON.stringify(b));
+    const result = merge(shards, path.join(dir, "merged.json"));
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /incompatible shard toolchain\/options metadata/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

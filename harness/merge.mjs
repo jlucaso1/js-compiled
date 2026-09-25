@@ -21,7 +21,7 @@ if (!files.length) {
 }
 
 const shards = files.map((f) => JSON.parse(readFileSync(f, "utf8"))).sort((a, b) => a.meta.startedAt.localeCompare(b.meta.startedAt));
-const compatibilityKeys = ["commit", "versions", "toolchains", "opts", "selectedRunners", "wasmtimeHostVersion"];
+const compatibilityKeys = ["commit", "versions", "referenceVersion", "toolchains", "opts", "selectedRunners", "wasmtimeHostVersion"];
 const stableMetadata = (meta) => JSON.stringify(Object.fromEntries(compatibilityKeys.map((key) => [key, meta[key] ?? null])));
 const baselineMetadata = stableMetadata(shards[0].meta);
 for (const shard of shards.slice(1)) {
@@ -44,6 +44,7 @@ const merged = {
       cpus: s.meta.cpus,
       spawnOverheadMs: s.meta.spawnOverheadMs?.median ?? null,
       versions: s.meta.versions ?? {},
+      referenceVersion: s.meta.referenceVersion ?? null,
       toolchains: s.meta.toolchains ?? null,
       opts: s.meta.opts ?? null,
       selectedRunners: s.meta.selectedRunners ?? null,
