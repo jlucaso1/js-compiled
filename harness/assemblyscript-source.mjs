@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { API } from "typescript/unstable/sync";
 import { createVirtualFileSystem } from "typescript/unstable/fs";
 import { SyntaxKind } from "typescript/unstable/ast";
@@ -6,6 +7,7 @@ import * as ts from "typescript/unstable/ast/is";
 
 export const ADAPTER_VERSION = "assemblyscript-result-v1";
 
+/** Check the caller against the disk source and expose its native AST and BOM offset. */
 function withSourceAst(source, fileName, callback) {
   // Native API paths use forward slashes, including virtual filesystem keys.
   const file = path.resolve(fileName).replaceAll("\\", "/");
@@ -24,14 +26,16 @@ function withSourceAst(source, fileName, callback) {
     snapshot = api.updateSnapshot({ openProjects: [config] });
     const project = snapshot.getProject(config);
     const ast = project?.program.getSourceFile(file);
-    if (!ast || ast.text !== source) {
+    // The native reader removes one leading BOM; all other text must match.
+    const sourceOffset = ast && source.startsWith("\uFEFF") && ast.text === source.slice(1) ? 1 : 0;
+    if (!ast || readFileSync(file, "utf8") !== source || ast.text !== source.slice(sourceOffset)) {
       throw new Error("unsupported adaptation: source changed while checking RESULT semantics");
     }
     const diagnostics = project.program.getSyntacticDiagnostics(file);
     if (diagnostics.length) {
       throw new Error(`unsupported adaptation: TypeScript parse error at ${diagnostics[0].pos}`);
     }
-    return callback(ast, project.checker);
+    return callback(ast, project.checker, sourceOffset);
   } finally {
     snapshot?.dispose();
     api.close();
@@ -50,8 +54,9 @@ function isResultCall(statement) {
     && argument.left.text === "RESULT ";
 }
 
+/** Rewrite the final numeric RESULT call while preserving all other source text. */
 export function adaptAssemblyScriptSource(source, fileName = "10-fib.ts") {
-  return withSourceAst(source, fileName, (ast, checker) => {
+  return withSourceAst(source, fileName, (ast, checker, sourceOffset) => {
     const last = ast.statements.at(-1);
     if (!last || !isResultCall(last)) {
       throw new Error('unsupported adaptation: expected a final console.log("RESULT " + numericExpression)');
@@ -88,7 +93,7 @@ export function adaptAssemblyScriptSource(source, fileName = "10-fib.ts") {
     while (identifiers.has(helperName)) helperName = `__assemblyscriptResultAdapter${++suffix}`;
 
     const replacement = `${helperName}(${expression.getText(ast)});`;
-    const rewritten = source.slice(0, last.getStart(ast)) + replacement + source.slice(last.end);
+    const rewritten = source.slice(0, last.getStart(ast) + sourceOffset) + replacement + source.slice(last.end + sourceOffset);
     const helper = `\nfunction ${helperName}(value: f64): void {\n  assert(isFinite(value) && value % 1.0 == 0.0 && Math.abs(value) <= 9007199254740991.0);\n  console.log("RESULT " + i64(value).toString());\n}\n`;
     return {
       source: rewritten + helper,
