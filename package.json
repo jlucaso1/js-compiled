@@ -13,7 +13,7 @@
   "type": "module",
   "dependencies": {
     "@assemblyscript/wasi-shim": "0.1.0",
-    "@geastack/compiler": "1.0.24",
+    "@geastack/compiler": "1.0.25",
     "@loopdive/js2": "0.71.0",
     "@perryts/perry": "0.5.1520",
     "assemblyscript": "0.28.20",

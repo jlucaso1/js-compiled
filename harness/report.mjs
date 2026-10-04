@@ -198,10 +198,8 @@ const versionRows = runners.map((r) => {
   const full = benches.map((b) => rec(b, r)?.version).find(Boolean) ?? "-";
   return `<tr><th scope="row">${esc(r)}</th><td class="l">${full === "-" ? "-" : disclosure(full, compactVersion(full))}</td></tr>`;
 }).join("");
-const commitRows = [["Porffor", "porfforCommit"], ["Static Hermes", "hermesCommit"],
-  ["QuickJS-ng", "quickjsCommit"], ["jz", "jzCommit"], ["WABT", "wabtCommit"]]
-  .filter(([, key]) => data.meta[key])
-  .map(([label, key]) => `<tr><th scope="row">${label} commit</th><td class="l">${hashDisclosure(data.meta[key])}</td></tr>`).join("");
+const porfforCommitRow = data.meta.porfforCommit
+  ? `<tr><th scope="row">porffor commit</th><td class="l">${hashDisclosure(data.meta.porfforCommit)}</td></tr>` : "";
 
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -259,7 +257,7 @@ ${data.meta.commit ? `<dt>Commit</dt><dd>${hashDisclosure(data.meta.commit)}</dd
 <dt>Method</dt><dd>${data.meta.opts.runs} timed runs after ${data.meta.opts.warmup} warmup, median reported · spawn overhead ${data.meta.spawnOverheadMs.median.toFixed(2)} ms${data.meta.wasmtimeHostVersion ? ` · Wasmtime ${esc(data.meta.wasmtimeHostVersion)}` : ""}</dd>
 ${data.meta.shards ? `<dt>Sharding</dt><dd>${data.meta.shards.length} CI jobs, one per bench &mdash; runners within a bench share a machine, different benches may not</dd>` : ""}
 </dl>
-<table class="versions"><thead><tr><th scope="col">runner</th><th scope="col" class="l">version / full provenance</th></tr></thead><tbody>${versionRows}${commitRows}
+<table class="versions"><thead><tr><th scope="col">runner</th><th scope="col" class="l">version / full provenance</th></tr></thead><tbody>${versionRows}${porfforCommitRow}
 </tbody></table></section>
 
 ${coverageSection}
