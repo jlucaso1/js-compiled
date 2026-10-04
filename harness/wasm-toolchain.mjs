@@ -3,8 +3,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-export const WASMTIME_VERSION = "49.0.1";
-export const WASMTIME_SHA256 = "c71f7e0d30a92e418f0d17db7c6d8f6664c1ad764340a1278678f4209deab534";
+export const WASMTIME_VERSION = "49.0.2";
+export const WASMTIME_SHA256 = "a4d6e9e3a5a60f527cf7793d674c48930c80c2e8977995b8a275cad3254b9322";
 export const WASMTIME = path.join(ROOT, "vendor", "wasmtime", "wasmtime");
 
 const lock = JSON.parse(readFileSync(path.join(ROOT, "package-lock.json"), "utf8"));

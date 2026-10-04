@@ -46,7 +46,7 @@ export const RUNNERS = {
     tier: "core",
     mode: "compiled",
     version: [BIN("scriptc"), "--version"],
-    compile: (file, out) => [BIN("scriptc"), "build", file, "-o", out, "--no-keep-c"],
+    compile: (file, out) => [BIN("scriptc"), "build", file, "-o", out, "--no-keep-llvm"],
   },
 
   geatsc: {
@@ -125,7 +125,7 @@ export const RUNNERS = {
     tier: "extra",
     mode: "compiled",
     version: [BIN("scriptc"), "--version"],
-    compile: (file, out) => [BIN("scriptc"), "build", file, "--dynamic", "-o", out, "--no-keep-c"],
+    compile: (file, out) => [BIN("scriptc"), "build", file, "--dynamic", "-o", out, "--no-keep-llvm"],
   },
 
   // Same program with the (runtime-irrelevant) type annotations removed, to show

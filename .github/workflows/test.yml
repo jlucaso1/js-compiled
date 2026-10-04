@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: latest
+          node-version: 26.10.0
       - name: Install GNU time for Linux RSS tests
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: latest
+          node-version: 26.10.0
       - name: Install native toolchain build requirements
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends clang cmake ninja-build
       - run: npm ci
@@ -66,7 +66,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: latest
+          node-version: 26.10.0
           cache: npm
       - name: Install GNU time for RSS measurements
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
@@ -104,7 +104,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: latest
+          node-version: 26.10.0
           cache: npm
       - name: Install GNU time for RSS measurements
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time
@@ -137,7 +137,7 @@ jobs:
           import assert from "node:assert/strict";
           import { readFileSync } from "node:fs";
           const data = JSON.parse(readFileSync("results/wasm-smoke.json", "utf8"));
-          assert.equal(data.meta.wasmtimeHostVersion.includes("49.0.1"), true);
+          assert.equal(data.meta.wasmtimeHostVersion.includes("49.0.2"), true);
           assert.equal(Object.keys(data.benches).length, 3);
           for (const [bench, entry] of Object.entries(data.benches)) {
             for (const runner of ["js2wasm", "assemblyscript"]) {
@@ -169,3 +169,36 @@ jobs:
         with:
           name: wasm-wasi-smoke
           path: results/wasm-smoke.json
+
+  report-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26.10.0
+          cache: npm
+      - run: npm ci
+      - name: Prepare isolated browser test tools and baseline renderer
+        run: |
+          npm install --prefix "$RUNNER_TEMP/report-browser-tools" --no-audit --no-fund \
+            chrome-devtools-axi@0.1.38 chrome-devtools-mcp@1.10.1
+          echo "$RUNNER_TEMP/report-browser-tools/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "CHROME_DEVTOOLS_AXI_MCP_PATH=$RUNNER_TEMP/report-browser-tools/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js" >> "$GITHUB_ENV"
+          # Only compare against the original affected renderer; later main
+          # pushes may have the fixed renderer as their base already.
+          git show f5439e1d41a7b49e573a9996feadc97dea4c5c57:harness/report.mjs > harness/.report-baseline.mjs
+      - name: Check real desktop/mobile layout and keyboard provenance disclosures
+        env:
+          BASELINE_REPORT: harness/.report-baseline.mjs
+          REPORT_BROWSER_OUTPUT: build/report-browser
+        run: node harness/report-browser-smoke.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: report-browser-before-after
+          path: build/report-browser/

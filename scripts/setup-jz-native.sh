@@ -2,8 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-JZ_REF="d3d5712b837df86265ccbbd955b76e4a6014a208"
-WABT_REF="ff0ef7e0009402740c805a9744c09b05be063e48"
+JZ_REF="202ef9d1e95f6f472f250724223459514fee2304"
+WABT_REF="93a552c0554392f9e26647ce216e21fd2581c566"
 
 clone_at() {
   local repo="$1" dir="$2" ref="$3"
@@ -31,7 +31,7 @@ clone_at WebAssembly/wabt vendor/wabt "$WABT_REF"
 if [ "$(cat vendor/wabt/.wabt_commit 2>/dev/null || true)" != "$WABT_REF" ] || [ ! -x vendor/wabt/build/wasm2c ]; then
   cmake -S vendor/wabt -B vendor/wabt/build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON -DBUILD_LIBWASM=OFF
-  cmake --build vendor/wabt/build --target wasm2c -j2
+  cmake --build vendor/wabt/build --target wasm2c -j1
 fi
 printf '%s\n' "$WABT_REF" > vendor/wabt/.wabt_commit
 

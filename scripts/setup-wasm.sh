@@ -3,8 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION=49.0.1
-SHA256=c71f7e0d30a92e418f0d17db7c6d8f6664c1ad764340a1278678f4209deab534
+VERSION=49.0.2
+SHA256=a4d6e9e3a5a60f527cf7793d674c48930c80c2e8977995b8a275cad3254b9322
 ASSET="wasmtime-v${VERSION}-x86_64-linux.tar.xz"
 URL="https://github.com/bytecodealliance/wasmtime/releases/download/v${VERSION}/${ASSET}"
 DEST="vendor/wasmtime/wasmtime"

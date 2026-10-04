@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Porffor has no package.json on main, so it is vendored from git at a pinned commit.
-PORFFOR_REF="${PORFFOR_REF:-de4eb588264885b3a1596f75010e371a2052033f}"
+PORFFOR_REF="${PORFFOR_REF:-72d048d73d49e217631ac8a1bc4fa9070d22fbc9}"
 PORFFOR_COMMIT_FILE="vendor/porffor/.porffor_commit"
 CURRENT_PORFFOR=""
 
@@ -33,8 +33,8 @@ else
   echo "porffor ${CURRENT_PORFFOR:0:7}"
 fi
 
-# Static Hermes (branch static_h)
-HERMES_REF="${HERMES_REF:-static_h}"
+# Static Hermes: immutable revision of the supported static_h branch.
+HERMES_REF="${HERMES_REF:-ade4a2b20246340d4309cf62be51f9652dcde279}"
 HERMES_COMMIT_FILE="vendor/hermes/.hermes_commit"
 BUILT_COMMIT_FILE="vendor/hermes/build/.built_commit"
 
@@ -48,7 +48,7 @@ elif [ -f "$HERMES_COMMIT_FILE" ]; then
   CURRENT_HERMES="$(cat "$HERMES_COMMIT_FILE" 2>/dev/null || true)"
 fi
 
-if [ -f vendor/hermes/build/bin/shermes ] && [ -n "$LAST_BUILT_COMMIT" ] && { [ "$LAST_BUILT_COMMIT" = "$HERMES_REF" ] || { [ "$HERMES_REF" = "static_h" ] && [ "$CURRENT_HERMES" = "$LAST_BUILT_COMMIT" ]; }; }; then
+if [ -f vendor/hermes/build/bin/shermes ] && [ "$CURRENT_HERMES" = "$HERMES_REF" ] && [ "$LAST_BUILT_COMMIT" = "$HERMES_REF" ]; then
   echo "$LAST_BUILT_COMMIT" > "$HERMES_COMMIT_FILE"
   echo "hermes ${LAST_BUILT_COMMIT:0:7}"
 else
@@ -74,13 +74,13 @@ else
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++
-    cmake --build vendor/hermes/build --target shermes-dep -j"$(nproc)"
+    cmake --build vendor/hermes/build --target shermes-dep -j1
     echo "$HERMES_COMMIT" > "$BUILT_COMMIT_FILE"
   fi
 fi
 
 # QuickJS-ng
-QUICKJS_REF="${QUICKJS_REF:-7e322b3236ae7f8b166b603df5557b217cb53945}"
+QUICKJS_REF="${QUICKJS_REF:-90c3922da00f52e477a622245a7c582fbcb7dea6}"
 QUICKJS_COMMIT_FILE="vendor/quickjs/.quickjs_commit"
 BUILT_QUICKJS_COMMIT_FILE="vendor/quickjs/build/.built_commit"
 
@@ -118,7 +118,7 @@ else
     echo "Building QuickJS-ng (${QUICKJS_COMMIT:0:7})..."
     cmake -S vendor/quickjs -B vendor/quickjs/build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release
-    cmake --build vendor/quickjs/build --target qjs -j"$(nproc)"
+    cmake --build vendor/quickjs/build --target qjs_exe -j1
     echo "$QUICKJS_COMMIT" > "$BUILT_QUICKJS_COMMIT_FILE"
   fi
 fi
@@ -126,17 +126,11 @@ fi
 command -v clang >/dev/null || echo "warning: clang not found (scriptc and shermes need it)"
 command -v cc >/dev/null || echo "warning: cc not found (porffor and quickjs need it)"
 
-# scriptc ships its LLVM helper without the executable bit set.
-for helper in node_modules/@scriptc/llvm-*/bin/scriptc-llvm-codegen; do
-  [ -e "$helper" ] || continue
-  chmod +x "$helper" || exit 1
-done
-
 # jz's native lane needs a commit-pinned compiler source and WABT's wasm2c
 # runtime. Hosted CI provisions clang/cmake/ninja before invoking this setup.
 ./scripts/setup-jz-native.sh
 if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
   ./scripts/setup-wasm.sh
 else
-  echo "wasmtime 49.0.1 setup skipped: pinned bundle currently supports Linux x86_64 only"
+  echo "wasmtime 49.0.2 setup skipped: pinned bundle currently supports Linux x86_64 only"
 fi

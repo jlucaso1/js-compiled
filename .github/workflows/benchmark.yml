@@ -49,12 +49,13 @@ jobs:
       - uses: actions/checkout@v4
       - id: list
         run: |
-          echo "benches=$(ls benches | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
-          echo "hermes_ref=$(git ls-remote https://github.com/facebook/hermes.git refs/heads/static_h | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "benches=$(node -e 'console.log(JSON.stringify(require("node:fs").readdirSync("benches").sort()))')" >> "$GITHUB_OUTPUT"
+          hermes_ref=$(grep 'HERMES_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
+          echo "hermes_ref=${hermes_ref}" >> "$GITHUB_OUTPUT"
           porffor_ref=$(grep 'PORFFOR_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
-          echo "porffor_ref=${porffor_ref:-038f415e08efc5f87a6bfcb05a18824caa3a14f6}" >> "$GITHUB_OUTPUT"
+          echo "porffor_ref=${porffor_ref}" >> "$GITHUB_OUTPUT"
           quickjs_ref=$(grep 'QUICKJS_REF=' scripts/setup.sh | head -1 | sed -E 's/.*:-([^"}]+).*/\1/')
-          echo "quickjs_ref=${quickjs_ref:-7e322b3236ae7f8b166b603df5557b217cb53945}" >> "$GITHUB_OUTPUT"
+          echo "quickjs_ref=${quickjs_ref}" >> "$GITHUB_OUTPUT"
           echo "os_image=${ImageOS:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
 
   build-tools:
@@ -69,7 +70,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 26.10.0
           cache: npm
 
       - name: Cache vendored toolchains
@@ -120,14 +121,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 26.10.0
           cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.9.7
 
       - name: Install system tools
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends time clang g++ cmake ninja-build libicu-dev
@@ -178,6 +179,38 @@ jobs:
             --timeout=120 \
             --build-timeout=300 \
             --out="results/shards/${{ matrix.bench }}.json"
+
+      - name: Require every selected runner's canonical numeric smoke
+        if: matrix.bench == '00-noop.ts' || matrix.bench == '10-fib.ts'
+        env:
+          BENCH: ${{ matrix.bench }}
+          RUNNERS: ${{ inputs.runners || 'all' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          import { RUNNERS } from "./harness/runners.mjs";
+          const bench = process.env.BENCH;
+          const data = JSON.parse(readFileSync(`results/shards/${bench}.json`, "utf8"));
+          const selected = process.env.RUNNERS === "all" ? Object.keys(RUNNERS) : process.env.RUNNERS.split(",");
+          const failures = [];
+          for (const runner of selected) {
+            try {
+              const result = data.benches[bench]?.runners[runner];
+              assert.ok(result, `${runner} was not attempted`);
+              assert.equal(result.status, "ok", `${runner}: ${result.error ?? result.status}`);
+              assert.equal(result.matchesReference, true, `${runner}: RESULT differs from Node`);
+              assert.ok(result.version && result.version !== "unknown", `${runner}: no actual version`);
+              assert.ok(result.maxRssKb > 0, `${runner}: missing RSS`);
+              assert.ok(result.time?.runs > 0, `${runner}: no timed samples`);
+              if (result.mode === "compiled") {
+                assert.ok(result.buildMs >= 0, `${runner}: no compile measurement`);
+                assert.ok(result.artifactKind === "wasm" ? result.moduleBytes > 0 && result.hostBytes > 0 : result.binBytes > 0, `${runner}: no artifact/host size`);
+              }
+            } catch (error) { failures.push(error.message); }
+          }
+          assert.deepEqual(failures, [], `${bench}: ${failures.join("; ")}`);
+          NODE
 
       - name: Require full Wasm runner coverage and measurements
         if: inputs.runners == '' || inputs.runners == 'all' || contains(inputs.runners, 'js2wasm') || contains(inputs.runners, 'assemblyscript')
@@ -248,7 +281,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 26.10.0
 
       - uses: actions/download-artifact@v4
         with:
