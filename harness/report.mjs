@@ -173,15 +173,33 @@ ${benches.map((b) => `<tr><th scope="row">${esc(shortName(b))}</th>${runners.map
 <tr class="total"><th scope="row">adapted-input passing (Wasm)</th>${runners.map((r) => `<td>${benches.some((b) => rec(b, r)?.artifactKind === "wasm") ? `${benches.filter((b) => rec(b, r)?.artifactKind === "wasm" && rec(b, r)?.sourceMode === "adapted" && statusOf(rec(b, r)).code === "ok").length}/${benches.length}` : "-"}</td>`).join("")}</tr>
 </tbody></table></div></section>`;
 
+// Keep full provenance in the generated document, behind native keyboard-
+// accessible disclosure controls rather than a truncated title attribute.
+function disclosure(full, label) {
+  return `<details><summary>${esc(label)}</summary><pre>${esc(full)}</pre></details>`;
+}
+function compactVersion(full) {
+  const first = full.split(/\r?\n|\s+\+\s+|;\s*/)[0]
+    .replace(/\s*\((?:npm integrity|archive SHA-256)[^)]*\)/g, "")
+    .replace(/\b[a-f0-9]{40,64}\b/gi, (hash) => hash.slice(0, 12));
+  return first.length > 80 ? `${first.slice(0, 77)}…` : first;
+}
+const hashDisclosure = (hash) => hash ? disclosure(hash, `${hash.slice(0, 12)}…`) : "-";
+
 const wasmInputRows = benches.flatMap((b) => runners.filter((r) => rec(b, r)?.artifactKind === "wasm").map((r) => {
   const x = rec(b, r);
-  return `<tr><th scope="row">${esc(shortName(b))}</th><td>${esc(r)}</td><td>${esc(x.sourceMode ?? "not built")}</td><td class="l"><code>${esc(x.sourcePath ?? "-")}</code></td><td class="l"><code>${esc(x.generatedPath ?? "-")}</code></td><td>${esc(x.adaptation?.version ?? "direct input")}</td><td class="l"><code>${esc(x.sourceSha256 ?? "-")}</code></td><td class="l"><code>${esc(x.generatedSha256 ?? "-")}</code></td></tr>`;
+  return `<tr><th scope="row">${esc(shortName(b))}</th><td>${esc(r)}</td><td>${esc(x.sourceMode ?? "not built")}</td><td class="l"><code>${esc(x.sourcePath ?? "-")}</code></td><td class="l"><code>${esc(x.generatedPath ?? "-")}</code></td><td>${esc(x.adaptation?.version ?? "direct input")}</td><td class="l">${hashDisclosure(x.sourceSha256)}</td><td class="l">${hashDisclosure(x.generatedSha256)}</td></tr>`;
 })).join("");
 const wasmInputSection = wasmInputRows ? `<section><h2>Wasm/WASI input provenance</h2>
 <p class="note"><code>original</code> means the canonical fixture was compiled directly. <code>adapted</code> means a bounded generated input was used; adapted coverage is not direct TypeScript coverage. Metric rankings include successful runs not flagged as differing from Node's RESULT, regardless of input mode; original and adapted inputs are identified separately above.</p>
-<div class="scroll"><table><thead><tr><th>bench</th><th>runner</th><th>input</th><th>source</th><th>generated input</th><th>adapter</th><th>source SHA-256</th><th>generated SHA-256</th></tr></thead><tbody>${wasmInputRows}</tbody></table></div></section>` : "";
+<div class="scroll"><table class="provenance"><thead><tr><th>bench</th><th>runner</th><th>input</th><th>source</th><th>generated input</th><th>adapter</th><th>source SHA-256</th><th>generated SHA-256</th></tr></thead><tbody>${wasmInputRows}</tbody></table></div></section>` : "";
 
-const versionRows = runners.map((r) => `<tr><th scope="row">${esc(r)}</th><td class="l">${esc(benches.map((b) => rec(b, r)?.version).find(Boolean) ?? "-")}</td></tr>`).join("");
+const versionRows = runners.map((r) => {
+  const full = benches.map((b) => rec(b, r)?.version).find(Boolean) ?? "-";
+  return `<tr><th scope="row">${esc(r)}</th><td class="l">${full === "-" ? "-" : disclosure(full, compactVersion(full))}</td></tr>`;
+}).join("");
+const porfforCommitRow = data.meta.porfforCommit
+  ? `<tr><th scope="row">porffor commit</th><td class="l">${hashDisclosure(data.meta.porfforCommit)}</td></tr>` : "";
 
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -196,8 +214,15 @@ h1{font-size:1.6rem;margin:0 0 .35rem}
 h2{font-size:1.1rem;margin:0 0 .3rem}
 .unit{color:var(--muted);font-weight:400;font-size:.85rem}
 .sub,.note{color:var(--ink-2);margin:0 0 1rem;font-size:.85rem}
-section{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:1.1rem 1.2rem;margin:0 0 1.25rem}
-.scroll{overflow-x:auto}
+section{min-width:0;background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:1.1rem 1.2rem;margin:0 0 1.25rem}
+.scroll{overflow-x:auto;max-width:100%}
+.versions{margin-top:1rem;table-layout:fixed}
+.versions th[scope=row]{width:30%}
+.versions th,.versions td,.provenance th,.provenance td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+details{min-width:0}
+summary{cursor:pointer;overflow-wrap:anywhere}
+summary:focus-visible{outline:2px solid var(--bar);outline-offset:2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.78rem;margin:.5rem 0;color:var(--ink-2)}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:.83rem}
 th,td{text-align:right;padding:.3rem .5rem;border-bottom:1px solid var(--grid);white-space:nowrap}
 thead th{color:var(--muted);font-weight:500;font-size:.78rem;border-bottom:1px solid var(--grid)}
@@ -213,7 +238,9 @@ td.st-ok{color:var(--ink)}
 td.st-none{color:var(--muted)}
 .l{text-align:left}
 tr.total th,tr.total td{font-weight:700;border-bottom:none}
-dl.env{display:grid;grid-template-columns:auto 1fr;gap:.15rem 1rem;margin:0;font-size:.85rem}
+dl.env{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.15rem 1rem;margin:0;font-size:.85rem}
+dl.env dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:600px){body{padding:1rem .75rem 2rem}section{padding:.85rem}dl.env{gap:.15rem .6rem}}
 dl.env dt{color:var(--muted)}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85em}
 a{color:var(--bar)}
@@ -226,12 +253,11 @@ footer{color:var(--muted);font-size:.8rem;margin-top:2rem}
 <dl class="env">
 <dt>Finished</dt><dd>${esc(data.meta.finishedAt ?? data.meta.startedAt)}</dd>
 <dt>Machine</dt><dd>${esc(data.meta.cpuModel ?? "unknown")} · ${data.meta.cpus} threads · ${data.meta.totalMemGb} GB · ${esc(data.meta.platform)}/${esc(data.meta.arch)}</dd>
-${data.meta.commit ? `<dt>Commit</dt><dd><code>${esc(data.meta.commit)}</code></dd>` : ""}
+${data.meta.commit ? `<dt>Commit</dt><dd>${hashDisclosure(data.meta.commit)}</dd>` : ""}
 <dt>Method</dt><dd>${data.meta.opts.runs} timed runs after ${data.meta.opts.warmup} warmup, median reported · spawn overhead ${data.meta.spawnOverheadMs.median.toFixed(2)} ms${data.meta.wasmtimeHostVersion ? ` · Wasmtime ${esc(data.meta.wasmtimeHostVersion)}` : ""}</dd>
 ${data.meta.shards ? `<dt>Sharding</dt><dd>${data.meta.shards.length} CI jobs, one per bench &mdash; runners within a bench share a machine, different benches may not</dd>` : ""}
 </dl>
-<table style="margin-top:1rem;max-width:520px"><thead><tr><th scope="col">runner</th><th scope="col" class="l">version</th></tr></thead><tbody>${versionRows}
-${data.meta.porfforCommit ? `<tr><th scope="row">porffor commit</th><td class="l"><code>${esc(data.meta.porfforCommit.slice(0, 12))}</code></td></tr>` : ""}
+<table class="versions"><thead><tr><th scope="col">runner</th><th scope="col" class="l">version / full provenance</th></tr></thead><tbody>${versionRows}${porfforCommitRow}
 </tbody></table></section>
 
 ${coverageSection}

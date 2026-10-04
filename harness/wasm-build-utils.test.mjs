@@ -22,7 +22,7 @@ test("a skipped or unavailable -O3 optimizer is rejected", () => {
 });
 
 test("Wasm execution commands use pinned Wasmtime and disable its cache", () => {
-  assert.equal(WASMTIME_VERSION, "49.0.1");
+  assert.equal(WASMTIME_VERSION, "49.0.2");
   assert.match(WASMTIME_SHA256, /^[a-f0-9]{64}$/);
   assert.deepEqual(makeWasmtimeCommand("build/f.wasm", "js2wasm").slice(1, -1), [
     "run", "-C", "cache=n", "-W", "gc=y,function-references=y,tail-call=y,exceptions=y",

@@ -25,6 +25,8 @@ test("report distinguishes adapted Wasm input and excludes mismatches from every
         startedAt: "2026-01-01T00:00:00.000Z", finishedAt: "2026-01-01T00:01:00.000Z",
         cpuModel: "test cpu", cpus: 2, totalMemGb: 2, platform: "linux", arch: "x64",
         opts: { runs: 2, warmup: 1, rssRuns: 2 }, spawnOverheadMs: { median: 0.1 },
+        porfforCommit: "c".repeat(40), hermesCommit: "d".repeat(40),
+        quickjsCommit: "e".repeat(40), jzCommit: "f".repeat(40), wabtCommit: "1".repeat(40),
         wasmtimeHostVersion: "wasmtime 49.0.1",
         toolchains: { wasmtime: { version: "49.0.1" } },
       },
@@ -44,6 +46,16 @@ test("report distinguishes adapted Wasm input and excludes mismatches from every
     assert.equal(run.status, 0, run.stderr);
     const markdown = readFileSync(md, "utf8");
     const page = readFileSync(html, "utf8");
+    for (const key of ["porfforCommit", "hermesCommit", "quickjsCommit", "jzCommit", "wabtCommit"]) {
+      assert.ok(markdown.includes(data.meta[key]), `${key} retained in Markdown`);
+    }
+    assert.deepEqual(JSON.parse(readFileSync(input, "utf8")).meta, data.meta);
+    const versions = page.split('<table class="versions">')[1].split("</table>")[0];
+    assert.match(versions, /<th scope="row">porffor commit<\/th>/);
+    assert.ok(versions.includes(`<summary>${"c".repeat(12)}…</summary><pre>${data.meta.porfforCommit}</pre>`));
+    for (const label of ["Static Hermes", "QuickJS-ng", "jz", "WABT"]) {
+      assert.ok(!versions.includes(`${label} commit`), `${label} has no extra commit row`);
+    }
     assert.match(markdown, /Wasm input provenance/);
     assert.match(markdown, /adapted/);
     assert.match(markdown, /assemblyscript-result-v1/);

@@ -41,7 +41,8 @@ column against the real AOT output.
 
 Porffor, Static Hermes, and QuickJS-ng are vendored from git. Local setup and the benchmark workflow
 both use the Porffor commit pinned in [`scripts/setup.sh`](scripts/setup.sh).
-Hermes uses `static_h` and QuickJS-ng uses its pinned commit; exact toolchain commits
+Hermes uses an immutable commit from `static_h`, and QuickJS-ng uses an immutable
+commit from `master`; local setup and CI share those pins. Exact toolchain commits
 are recorded in every result file. Perry is pinned to 0.5.1520 for reproducibility.
 
 ## Usage
@@ -60,9 +61,15 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
-Requires Node 24+, `clang` (scriptc, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+The HTML report shows compact version and hash labels. Expand their disclosure
+controls (click, or focus and press Enter) to read full provenance. Wide metric
+tables scroll within their sections rather than widening the page. Full toolchain
+commit metadata remains available in the result JSON and generated Markdown.
 
-Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
+Requires Node 24+ (CI pins 26.10.0), `clang` (scriptc executable linking, Perry, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+
+Perry, scriptc, and geatsc use exact releases in `package-lock.json`. scriptc 0.2.2
+ships a native compiler and bundled LLVM/runtime; C emission is no longer available. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
 
 The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
 
@@ -145,9 +152,8 @@ HTTP throughput, startup under I/O load, container image size, energy use.
 
 ### Known toolchain issues
 
-- `scriptc --dynamic` still rejects `SC2011` (`any`-typed operator) even though
-  `scriptc coverage --dynamic` reports the site as compilable — so `31-json` fails
-  to build in both scriptc modes.
+- scriptc 0.2.2 rejects `31-json` with `SC1043` on its dynamically typed checksum
+  update, in both static and `--dynamic` modes.
 - A runner that exhausts memory used to take the whole CI agent down with it, so
   every run is capped by an RSS watchdog (`--mem-limit-mb`, 4096 by default) and
   reported as `out-of-memory`. The harness also raises its own `oom_score_adj`

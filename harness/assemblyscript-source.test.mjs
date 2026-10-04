@@ -44,6 +44,25 @@ test("AST adapter rejects malformed output, shadowed console, and unknown/non-nu
   }
 });
 
+test("native TypeScript checker rejects stale input and malformed syntax", () => {
+  const source = 'let value: number = 7; console.log("RESULT " + value);';
+  withSource(source, (file) => {
+    assert.throws(() => adaptAssemblyScriptSource(source.replace("7", "8"), file), /source changed/);
+  });
+  withSource('let value: number = ; console.log("RESULT " + value);', (file) => {
+    assert.throws(() => adaptAssemblyScriptSource(readFileSync(file, "utf8"), file), /TypeScript parse error/);
+  });
+});
+
+test("native AST offsets preserve Unicode and LF/CRLF input with numeric RESULT behavior", async () => {
+  for (const newline of ["\n", "\r\n"]) {
+    const source = ['// Unicode prefix: calculator 🧮', 'let value: number = 17;', 'console.log("RESULT " + value);', ''].join(newline);
+    const result = await executeAdaptedSource(source);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "RESULT 17\n");
+  }
+});
+
 test("generated adapter evaluates a side-effecting RESULT expression exactly once", async () => {
   const source = `let calls: number = 0;
 function next(): number { calls++; return calls; }
