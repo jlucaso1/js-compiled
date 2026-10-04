@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { WASI } from "node:wasi";
 import asc from "assemblyscript/asc";
 import { tmpdir } from "node:os";
@@ -54,9 +54,27 @@ test("native TypeScript checker rejects stale input and malformed syntax", () =>
   });
 });
 
+test("native adapter maps only a removed leading BOM to original rewrite boundaries", () => {
+  for (const bom of ["", "\uFEFF"]) {
+    for (const newline of ["\n", "\r\n"]) {
+      const prefix = `${bom}// 🧮 é 中${newline}let value: number = 17;${newline}/* 🧮 */ `;
+      const suffix = ` /* é 🧮 */${newline}`;
+      const source = `${prefix}console.log("RESULT " + (value /* 🧮 */ + 0));${suffix}`;
+      withSource(source, (file) => {
+        const adapted = adaptAssemblyScriptSource(source, file);
+        assert.ok(adapted.source.startsWith(`${prefix}${adapted.helperName}((value /* 🧮 */ + 0));${suffix}`));
+        assert.equal(readFileSync(file, "utf8"), source);
+        for (const stale of [source.replace("17", "18"), source + " ", source.replace("🧮", "x"), `\uFEFF\uFEFF${source}`]) {
+          assert.throws(() => adaptAssemblyScriptSource(stale, file), /source changed/);
+        }
+      });
+    }
+  }
+});
+
 test("native AST offsets preserve Unicode and LF/CRLF input with numeric RESULT behavior", async () => {
   for (const newline of ["\n", "\r\n"]) {
-    const source = ['// Unicode prefix: calculator 🧮', 'let value: number = 17;', 'console.log("RESULT " + value);', ''].join(newline);
+    const source = ['\uFEFF// Unicode prefix: calculator 🧮', 'let value: number = 17;', 'console.log("RESULT " + value);', ''].join(newline);
     const result = await executeAdaptedSource(source);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, "RESULT 17\n");
@@ -64,7 +82,7 @@ test("native AST offsets preserve Unicode and LF/CRLF input with numeric RESULT 
 });
 
 test("generated adapter evaluates a side-effecting RESULT expression exactly once", async () => {
-  const source = `let calls: number = 0;
+  const source = `\uFEFFlet calls: number = 0;
 function next(): number { calls++; return calls; }
 console.log("RESULT " + next());
 `;
@@ -115,6 +133,12 @@ async function executeAdaptedSource(source, after = "") {
       "--runtime", "incremental", "-O3", "-o", wasm,
     ]);
     assert.equal(compiled.error, null, compiled.stderr.toString());
+    if (process.env.AS_ADAPTER_WASMTIME) {
+      const result = spawnSync(process.env.AS_ADAPTER_WASMTIME, [wasm], { encoding: "utf8" });
+      assert.ifError(result.error);
+      // Wasmtime reports a WASI exit as the host process exit status.
+      return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+    }
     const stdoutPath = path.join(dir, "stdout");
     const stderrPath = path.join(dir, "stderr");
     const stdout = openSync(stdoutPath, "w+");
@@ -155,7 +179,7 @@ test("generated AssemblyScript formatter preserves JS safe integer spelling", as
 
 test("generated AssemblyScript formatter rejects non-finite and non-safe integers", async () => {
   for (const literal of ["1.5", "NaN", "Infinity", "-Infinity", "9007199254740992", "-9007199254740992"]) {
-    const source = `let value: number = ${literal};\nconsole.log("RESULT " + value);\n`;
+    const source = `\uFEFFlet value: number = ${literal};\nconsole.log("RESULT " + value);\n`;
     const result = await executeAdaptedSource(source);
     assert.equal(result.status, 255, `${literal}: ${result.stderr}`);
     assert.equal(result.stdout, "", literal);

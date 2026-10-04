@@ -111,6 +111,8 @@ jobs:
       - run: npm ci
       - name: Install and verify pinned Wasmtime
         run: ./scripts/setup-wasm.sh
+      - name: Execute adapter regressions with pinned Wasmtime and native TypeScript
+        run: AS_ADAPTER_WASMTIME="$PWD/vendor/wasmtime/wasmtime" node --test harness/assemblyscript-source.test.mjs
       - name: Confirm original AssemblyScript Fibonacci remains unsupported
         run: |
           mkdir -p build/as-negative
