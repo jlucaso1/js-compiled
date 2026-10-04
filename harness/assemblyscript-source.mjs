@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { API } from "typescript/unstable/sync";
 import { createVirtualFileSystem } from "typescript/unstable/fs";
 import { SyntaxKind } from "typescript/unstable/ast";
@@ -6,6 +7,7 @@ import * as ts from "typescript/unstable/ast/is";
 
 export const ADAPTER_VERSION = "assemblyscript-result-v1";
 
+/** Check the caller against the disk source and expose its native AST and BOM offset. */
 function withSourceAst(source, fileName, callback) {
   // Native API paths use forward slashes, including virtual filesystem keys.
   const file = path.resolve(fileName).replaceAll("\\", "/");
@@ -26,7 +28,7 @@ function withSourceAst(source, fileName, callback) {
     const ast = project?.program.getSourceFile(file);
     // The native reader removes one leading BOM; all other text must match.
     const sourceOffset = ast && source.startsWith("\uFEFF") && ast.text === source.slice(1) ? 1 : 0;
-    if (!ast || ast.text !== source.slice(sourceOffset)) {
+    if (!ast || readFileSync(file, "utf8") !== source || ast.text !== source.slice(sourceOffset)) {
       throw new Error("unsupported adaptation: source changed while checking RESULT semantics");
     }
     const diagnostics = project.program.getSyntacticDiagnostics(file);
@@ -52,6 +54,7 @@ function isResultCall(statement) {
     && argument.left.text === "RESULT ";
 }
 
+/** Rewrite the final numeric RESULT call while preserving all other source text. */
 export function adaptAssemblyScriptSource(source, fileName = "10-fib.ts") {
   return withSourceAst(source, fileName, (ast, checker, sourceOffset) => {
     const last = ast.statements.at(-1);

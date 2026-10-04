@@ -8,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { adaptAssemblyScriptSource } from "./assemblyscript-source.mjs";
 
+/** Create an on-disk fixture for a synchronous callback and remove it afterward. */
 function withSource(source, callback) {
   const dir = mkdtempSync(path.join(tmpdir(), "as-source-adapter-"));
   const file = path.join(dir, "fixture.ts");
@@ -64,7 +65,11 @@ test("native adapter maps only a removed leading BOM to original rewrite boundar
         const adapted = adaptAssemblyScriptSource(source, file);
         assert.ok(adapted.source.startsWith(`${prefix}${adapted.helperName}((value /* 🧮 */ + 0));${suffix}`));
         assert.equal(readFileSync(file, "utf8"), source);
-        for (const stale of [source.replace("17", "18"), source + " ", source.replace("🧮", "x"), `\uFEFF\uFEFF${source}`]) {
+        for (const stale of [
+          source.replace("17", "18"), source + " ", source.replace("🧮", "x"),
+          `\uFEFF${source}`, `\uFEFF\uFEFF${source}`,
+          ...(bom ? [source.slice(1)] : []),
+        ]) {
           assert.throws(() => adaptAssemblyScriptSource(stale, file), /source changed/);
         }
       });
@@ -110,6 +115,7 @@ console.log("RESULT " + (__assemblyscriptResultAdapter + __assemblyscriptResultA
   assert.equal(result.stdout, "RESULT 3\n");
 });
 
+/** Compile an adapted fixture and capture its exit status and output through the selected WASI host. */
 async function executeAdaptedSource(source, after = "") {
   const root = path.resolve(import.meta.dirname, "..");
   const build = path.join(root, "build");
@@ -136,7 +142,7 @@ async function executeAdaptedSource(source, after = "") {
     if (process.env.AS_ADAPTER_WASMTIME) {
       const result = spawnSync(process.env.AS_ADAPTER_WASMTIME, [wasm], { encoding: "utf8" });
       assert.ifError(result.error);
-      // Wasmtime reports a WASI exit as the host process exit status.
+      // Wasmtime rejects WASI exit 255 and reports host status 1 instead.
       return { status: result.status, stdout: result.stdout, stderr: result.stderr };
     }
     const stdoutPath = path.join(dir, "stdout");
@@ -181,7 +187,8 @@ test("generated AssemblyScript formatter rejects non-finite and non-safe integer
   for (const literal of ["1.5", "NaN", "Infinity", "-Infinity", "9007199254740992", "-9007199254740992"]) {
     const source = `\uFEFFlet value: number = ${literal};\nconsole.log("RESULT " + value);\n`;
     const result = await executeAdaptedSource(source);
-    assert.equal(result.status, 255, `${literal}: ${result.stderr}`);
+    assert.equal(result.status, process.env.AS_ADAPTER_WASMTIME ? 1 : 255, `${literal}: ${result.stderr}`);
+    assert.match(result.stderr, /abort:.*generated\.ts\(/, literal);
     assert.equal(result.stdout, "", literal);
   }
 });
