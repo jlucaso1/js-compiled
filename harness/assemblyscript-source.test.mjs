@@ -54,11 +54,13 @@ test("native TypeScript checker rejects stale input and malformed syntax", () =>
   });
 });
 
-test("native AST offsets preserve Unicode input and numeric RESULT behavior", async () => {
-  const source = '// Unicode prefix: calculator 🧮\nlet value: number = 17;\nconsole.log("RESULT " + value);\n';
-  const result = await executeAdaptedSource(source);
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "RESULT 17\n");
+test("native AST offsets preserve Unicode and LF/CRLF input with numeric RESULT behavior", async () => {
+  for (const newline of ["\n", "\r\n"]) {
+    const source = ['// Unicode prefix: calculator 🧮', 'let value: number = 17;', 'console.log("RESULT " + value);', ''].join(newline);
+    const result = await executeAdaptedSource(source);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "RESULT 17\n");
+  }
 });
 
 test("generated adapter evaluates a side-effecting RESULT expression exactly once", async () => {

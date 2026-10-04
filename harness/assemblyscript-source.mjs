@@ -7,7 +7,8 @@ import * as ts from "typescript/unstable/ast/is";
 export const ADAPTER_VERSION = "assemblyscript-result-v1";
 
 function withSourceAst(source, fileName, callback) {
-  const file = path.resolve(fileName);
+  // Native API paths use forward slashes, including virtual filesystem keys.
+  const file = path.resolve(fileName).replaceAll("\\", "/");
   const config = `${file}.assemblyscript.tsconfig.json`;
   // TypeScript 7 exposes AST and checker data through its native API. The
   // virtual config retains our strict, single-fixture check without writing
