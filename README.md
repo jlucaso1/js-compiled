@@ -61,6 +61,11 @@ node harness/run.mjs --runners=node,perry --quick  # test the pinned Perry relea
 node harness/report.mjs            # results/latest.json -> REPORT.md + site/index.html
 ```
 
+The HTML report shows compact version and hash labels. Expand their disclosure
+controls (click, or focus and press Enter) to read full provenance. Wide metric
+tables scroll within their sections rather than widening the page. Full toolchain
+commit metadata remains available in the result JSON and generated Markdown.
+
 Requires Node 24+ (CI pins 26.10.0), `clang` (scriptc executable linking, Perry, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
 Perry, scriptc, and geatsc use exact releases in `package-lock.json`. scriptc 0.2.2
