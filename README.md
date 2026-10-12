@@ -66,9 +66,9 @@ controls (click, or focus and press Enter) to read full provenance. Wide metric
 tables scroll within their sections rather than widening the page. Full toolchain
 commit metadata remains available in the result JSON and generated Markdown.
 
-Requires Node 24+ (CI pins 26.10.0), `clang` (scriptc executable linking, Perry, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
+Requires Node 24+ (CI pins 26.11.1), `clang` (scriptc executable linking, Perry, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
-Perry, scriptc, and geatsc use exact releases in `package-lock.json`. scriptc 0.2.2
+Perry, scriptc, and geatsc use exact releases in `package-lock.json`. scriptc 0.2.7
 ships a native compiler and bundled LLVM/runtime; C emission is no longer available. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
 
 The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
@@ -180,3 +180,18 @@ scripts/setup-wasm.sh             checksum-verifies the pinned Wasmtime host
 ## License
 
 MIT
+
+## Toolchain refresh, 2026-10-12
+
+CI pins Node 26.11.1 and Bun 1.4.3 from their official stable distributions.
+The lockfile pins scriptc 0.2.7 and geatsc 1.0.32. scriptc latest 0.2.9 and 0.2.8 lack their declared Windows npm package, so 0.2.7 is retained as the newest complete cross-platform distribution. Vendored
+Porffor, Static Hermes, QuickJS-ng, jz and WABT use immutable commits from their
+existing main/static_h/master channels. Wasmtime 49.0.2 and its verified archive
+checksum are unchanged. AssemblyScript retains its scoped Binaryen nightly
+override; the independent js2wasm optimizer remains on stable Binaryen 132.0.0.
+Other npm compiler pins remain at their current latest stable releases.
+
+The historical scriptc 0.2.2 JSON diagnostic above is not a validation result
+for 0.2.7. Actual executable versions and benchmark compatibility must be read
+from the matching CI artifacts, rather than inferred from these pins. Native
+support tools continue to come from the hosted runner distribution packages.
