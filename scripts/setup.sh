@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Porffor has no package.json on main, so it is vendored from git at a pinned commit.
-PORFFOR_REF="${PORFFOR_REF:-72d048d73d49e217631ac8a1bc4fa9070d22fbc9}"
+PORFFOR_REF="${PORFFOR_REF:-0342e06d1c893c15eb9d22c5fc2bfe2c5965c81b}"
 PORFFOR_COMMIT_FILE="vendor/porffor/.porffor_commit"
 CURRENT_PORFFOR=""
 
@@ -34,7 +34,7 @@ else
 fi
 
 # Static Hermes: immutable revision of the supported static_h branch.
-HERMES_REF="${HERMES_REF:-ade4a2b20246340d4309cf62be51f9652dcde279}"
+HERMES_REF="${HERMES_REF:-820aa0d4b5fe5d3ed7900e1274211ef561081b3f}"
 HERMES_COMMIT_FILE="vendor/hermes/.hermes_commit"
 BUILT_COMMIT_FILE="vendor/hermes/build/.built_commit"
 
@@ -80,7 +80,7 @@ else
 fi
 
 # QuickJS-ng
-QUICKJS_REF="${QUICKJS_REF:-90c3922da00f52e477a622245a7c582fbcb7dea6}"
+QUICKJS_REF="${QUICKJS_REF:-9b061718955874e648d8c2bf2910a717aac8fa63}"
 QUICKJS_COMMIT_FILE="vendor/quickjs/.quickjs_commit"
 BUILT_QUICKJS_COMMIT_FILE="vendor/quickjs/build/.built_commit"
 
