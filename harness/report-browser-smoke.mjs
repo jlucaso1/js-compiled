@@ -11,7 +11,7 @@ const output = path.resolve(process.env.REPORT_BROWSER_OUTPUT ?? "build/report-b
 mkdirSync(output, { recursive: true });
 const hash = "abcdef0123456789".repeat(4);
 const integrity = "sha512-" + "AbCd0123+/".repeat(40) + "==";
-const fullVersion = `assemblyscript@0.28.20 (npm integrity ${integrity}) + wasi-shim@0.1.0 + Wasmtime 49.0.2 (archive SHA-256 ${hash}) <literal & provenance>`;
+const fullVersion = `assemblyscript@0.28.20 (npm integrity ${integrity}) + wasi-shim@0.1.0 + Wasmtime 49.0.3 (archive SHA-256 ${hash}) <literal & provenance>`;
 const time = { min: 2, max: 2, mean: 2, median: 2, stddev: 0, runs: 2 };
 const data = {
   meta: {
@@ -19,7 +19,7 @@ const data = {
     totalMemGb: 8, platform: "linux", arch: "x64", commit: hash.slice(0, 40),
     porfforCommit: hash.slice(0, 40), hermesCommit: hash.slice(0, 40),
     opts: { runs: 2, warmup: 1 }, spawnOverheadMs: { median: 0.1 },
-    wasmtimeHostVersion: "wasmtime 49.0.2",
+    wasmtimeHostVersion: "wasmtime 49.0.3",
   },
   benches: {
     "10-fib.ts": { reference: { output: "96631268" }, runners: {
