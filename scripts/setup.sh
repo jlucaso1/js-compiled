@@ -34,7 +34,7 @@ else
 fi
 
 # Static Hermes: immutable revision of the supported static_h branch.
-HERMES_REF="${HERMES_REF:-820aa0d4b5fe5d3ed7900e1274211ef561081b3f}"
+HERMES_REF="${HERMES_REF:-763886c5dc8a95946b187dc65a27387eb00410f7}"
 HERMES_COMMIT_FILE="vendor/hermes/.hermes_commit"
 BUILT_COMMIT_FILE="vendor/hermes/build/.built_commit"
 
@@ -132,5 +132,5 @@ command -v cc >/dev/null || echo "warning: cc not found (porffor and quickjs nee
 if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
   ./scripts/setup-wasm.sh
 else
-  echo "wasmtime 49.0.2 setup skipped: pinned bundle currently supports Linux x86_64 only"
+  echo "wasmtime 49.0.3 setup skipped: pinned bundle currently supports Linux x86_64 only"
 fi

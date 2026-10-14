@@ -120,14 +120,6 @@ export const RUNNERS = {
     compile: (file, out) => [process.execPath, path.join(ROOT, "harness", "jz-native-build.mjs"), file, out],
   },
 
-  "scriptc-dynamic": {
-    label: "scriptc --dynamic",
-    tier: "extra",
-    mode: "compiled",
-    version: [BIN("scriptc"), "--version"],
-    compile: (file, out) => [BIN("scriptc"), "build", file, "--dynamic", "-o", out, "--no-keep-llvm"],
-  },
-
   // Same program with the (runtime-irrelevant) type annotations removed, to show
   // what Porffor's TypeScript front end is worth.
   "porffor-js": {

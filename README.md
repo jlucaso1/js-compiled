@@ -23,7 +23,6 @@ Extras, enabled with `--runners=all`:
 
 | runner | what it is |
 |---|---|
-| `scriptc-dynamic` | scriptc with `--dynamic`, embedding quickjs-ng for what will not compile statically |
 | `porffor-js` | Porffor fed the same program with type annotations stripped |
 | `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
 | `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |

@@ -2,8 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-JZ_REF="8ad5f6f80f7ee1311de642bc0b3fc0ab947bc59a"
-WABT_REF="e5cc0c4b7c46a322cd1673ffd904c69ae8625ce3"
+JZ_REF="edd43141c63860b7ddfe0d2c8b2c3241e577872c"
+WABT_REF="1e9fffd80efa901b3e4708d4ba1f0df972e63518"
 
 clone_at() {
   local repo="$1" dir="$2" ref="$3"
