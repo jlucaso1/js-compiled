@@ -26,6 +26,7 @@ Extras, enabled with `--runners=all`:
 | `porffor-js` | Porffor fed the same program with type annotations stripped |
 | `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
 | `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |
+| `bun-aot` | Experimental [Bun PR #45631](https://github.com/oven-sh/bun/pull/45631), `bun build --compile --aot --compile-trim-runtime`; machine code with a trimmed runtime |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
 | `deno-compile` | `deno compile` (V8) — same idea |
 | `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine |
@@ -50,6 +51,8 @@ are recorded in every result file.
 npm ci
 ./scripts/setup.sh                 # vendors native tools, pinned jz/WABT, and Wasmtime
 
+./scripts/setup-bun-aot.sh         # optional experimental Bun AOT, Linux x86_64
+
 node harness/run.mjs --list        # benches and runners
 node harness/run.mjs               # the core candidates, 5 runs each
 node harness/run.mjs --runners=all
@@ -67,7 +70,9 @@ commit metadata remains available in the result JSON and generated Markdown.
 
 Requires Node 24+, `clang` (scriptc executable linking, Perry, Static Hermes, jz-native), a C++20 compiler (`c++` by default; set `CXX` to another compiler executable for geatsc), `cc` (Porffor, QuickJS-ng), `cmake`, `ninja`, ICU development headers and Python 3 (Static Hermes), and GNU `time` on Linux (peak RSS). jz-native also builds pinned WABT `wasm2c` sources. The Wasm compiler, WASI shim, TypeScript, and separate Binaryen versions and integrity hashes are pinned in [`package-lock.json`](package-lock.json). [`scripts/setup-wasm.sh`](scripts/setup-wasm.sh) pins the Wasmtime release and verifies its archive SHA-256 before installation. npm package version/integrity and the upstream git revision are distinct provenance; no upstream commit is inferred from the npm package. Wasmtime setup and Wasm runner execution currently require Linux x86_64. The Node/Perry comparison also runs on macOS using BSD `time -l` and a `ps` process-tree watchdog. Run `npm test` to check watchdog behavior.
 
-Perry, scriptc, and geatsc use exact releases in `package-lock.json`. scriptc
+Perry, scriptc, and geatsc use exact releases in `package-lock.json`. Geatsc 1.0.34
+requires the pinned `@geastack/core` and `@geastack/host` packages for its built-in
+Gea plugin and declarations, including when compiling plain TypeScript. scriptc
 ships a native compiler and bundled LLVM/runtime; C emission is no longer available. Geatsc's generated C++ is linked with `c++ -std=c++20 -O2 -ffp-contract=off` to preserve JavaScript's separate floating-point operation rounding; result metadata records both the geatsc and C++ compiler versions. Set `CXX` to select a different GCC- or Clang-compatible C++ compiler executable.
 
 The initial `jz-native` adapter supports the numeric `00-noop` and `10-fib` fixtures. Other benchmarks are explicitly reported as unsupported until their output bridge and host imports are validated; unsupported rows are not counted as passing. Its focused native smoke test builds standalone binaries and checks their `RESULT` values against Node in hosted CI.
@@ -85,6 +90,34 @@ For a local Perry compiler or an older installation, set `PERRY_BIN` to its abso
 ```bash
 PERRY_BIN=/absolute/path/to/perry node harness/run.mjs --runners=node,perry --quick
 ```
+
+### Experimental Bun AOT
+
+`bun-aot` is an extra candidate, separate from stable `bun` and `bun-compile`.
+Setup uses `bunx bun-pr@1.0.42` with the exact PR commit in
+[`scripts/bun-aot.json`](scripts/bun-aot.json), then checks the downloaded binary's
+SHA-256 before executing it. It requires stable Bun's `bunx` and Linux x86_64.
+The harness rejects missing or changed provenance instead of falling back to
+stable Bun. CI installs the same binary for every benchmark shard.
+
+The pinned artifact is `54c5048fbca1416685e833a0c46976c277f80ac2` from
+[Bun's Buildkite build 127754](https://buildkite.com/bun/bun/builds/127754), reporting
+`1.4.4-canary.1+54c5048fb`. This was the ready artifact selected by `bun-pr 45631`
+on October 17, 2026. The overall upstream build was canceled and the draft PR's
+head has advanced, so this is neither a stable release nor a claim of green
+upstream CI. Reproduction fails closed if the pinned artifact expires.
+
+The candidate compiles unchanged canonical TypeScript with both `--aot` and
+`--compile-trim-runtime`, without adding stricter optional deny flags. AOT gives
+types runtime meaning: typed boundaries validate values, primitive `as` casts
+convert, built-ins are immutable, `T[]` requires ordinary arrays without accessor
+elements, and
+`with` and caller-scope declarations from direct `eval` are restricted. Dynamic
+code may still use the interpreter. `--compile-trim-runtime` removes runtime
+parts; it does not make the executable runtime-free. These semantics differ from
+the stable JIT candidates, so output parity and failed builds remain part of the
+comparison. Results record the compiler commit, binary checksum, source hash,
+and compile command. No upstream performance numbers are used as suite results.
 
 ## Benchmarks
 

@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh', 'scripts/setup-bun-aot.sh', 'scripts/bun-aot.json') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
@@ -91,6 +91,12 @@ jobs:
         run: |
           npm ci
           ./scripts/setup.sh
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - name: Install checksum-pinned experimental Bun AOT compiler
+        run: ./scripts/setup-bun-aot.sh
 
       - name: Package vendored toolchains
         run: tar -czf vendor-bundle.tar.gz vendor/
@@ -160,6 +166,7 @@ jobs:
           node --version
           node_modules/.bin/perry --version
           bun --version
+          vendor/bun-aot/bun --revision
           deno --version
           clang --version | head -1
           vendor/hermes/build/bin/shermes -version 2>/dev/null | grep -i "Static Hermes" || true

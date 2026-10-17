@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-JZ_REF="edd43141c63860b7ddfe0d2c8b2c3241e577872c"
+JZ_REF="bd7d050691409ce27590f9d4ac4ca377408bbea9"
 WABT_REF="1e9fffd80efa901b3e4708d4ba1f0df972e63518"
 
 clone_at() {

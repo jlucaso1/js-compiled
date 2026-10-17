@@ -85,8 +85,13 @@ for (const n of opts.runners) {
 
 const active = [];
 const unavailable = new Map();
+const compilerProvenance = {};
 for (const name of opts.runners) {
-  const missing = missingDependency(name);
+  let missing = missingDependency(name);
+  if (!missing && RUNNERS[name].compilerProvenance) {
+    try { compilerProvenance[name] = RUNNERS[name].compilerProvenance(); }
+    catch (error) { missing = error.message; }
+  }
   if (missing) {
     unavailable.set(name, missing);
     console.error(`unavailable ${name}: missing ${missing} (run scripts/setup.sh)`);
@@ -127,6 +132,7 @@ function failure(r, phase) {
 }
 
 async function version(name) {
+  if (compilerProvenance[name]) return compilerProvenance[name].revision;
   const r = await timeRun(RUNNERS[name].version, { timeoutMs: 60000 });
   if (RUNNERS[name].artifactKind === "wasm" && !r.ok) {
     throw new Error(`${name} toolchain version verification failed: ${firstLines(r.stderr || r.stdout) || r.spawnError || `exit ${r.exitCode}`}`);
@@ -136,8 +142,8 @@ async function version(name) {
   return matched || lines[0] || "unknown";
 }
 
-// Type annotations have no runtime meaning; stripping them only removes syntax
-// a compiler front end may choke on.
+// Only runners that explicitly request stripped JS use this path. Experimental
+// Bun AOT gives types runtime meaning and must receive the canonical source.
 function sourceFor(runner, bench) {
   const abs = path.join(BENCH_DIR, bench);
   if (runner.source !== "stripped-js" || !bench.endsWith(".ts")) return abs;
@@ -155,7 +161,19 @@ async function build(name, runner, bench) {
   const manifestPath = `${outPath}.manifest.json`;
   rmSync(outPath, { force: true });
   rmSync(manifestPath, { force: true });
-  const r = await timeRun(runner.compile(sourceFor(runner, bench), outPath), {
+  const compileCommand = runner.compile(sourceFor(runner, bench), outPath);
+  let verifiedProvenance = null;
+  if (runner.compilerProvenance) {
+    try {
+      verifiedProvenance = runner.compilerProvenance();
+      if (JSON.stringify(verifiedProvenance) !== JSON.stringify(compilerProvenance[name])) {
+        throw new Error("compiler provenance changed after setup verification");
+      }
+    } catch (error) {
+      return { ok: false, status: "unavailable", phase: "setup", error: error.message, compileCommand, compilerProvenance: null };
+    }
+  }
+  const r = await timeRun(compileCommand, {
     cwd: BUILD_DIR,
     timeoutMs: opts.buildTimeout * 1000,
     memLimitKb: limitKb,
@@ -166,7 +184,10 @@ async function build(name, runner, bench) {
     return {
       ok: false,
       buildMs: r.wallMs,
+      compileCommand,
+      compilerProvenance: verifiedProvenance,
       ...failed,
+      ...(r.ok && !existsSync(outPath) ? { error: "compiler exited successfully without producing the requested artifact" } : {}),
       ...(unsupported ? { status: "unsupported", phase: "adapt", error: `${r.stderr ?? ""}`.trim().replace(/^UNSUPPORTED:\s*/, "") } : {}),
     };
   }
@@ -192,6 +213,8 @@ async function build(name, runner, bench) {
     outPath,
     buildMs: r.wallMs,
     manifest,
+    compileCommand,
+    compilerProvenance: verifiedProvenance,
     ...(runner.artifactKind === "wasm"
       ? { moduleBytes: bytes, hostBytes: runner.hostBytes(), hostExecutable: runner.hostExecutable }
       : { binBytes: bytes }),
@@ -282,6 +305,7 @@ const results = {
     versions,
     referenceVersion,
     toolchains,
+    bunAot: compilerProvenance["bun-aot"] ?? null,
     wasmtimeHostVersion: pinnedWasmtimeVersion,
     selectedRunners: opts.runners,
     unavailableRunners: Object.fromEntries(unavailable),
@@ -321,6 +345,11 @@ for (const bench of benches) {
       sourcePolicy: runner.sourcePolicy ?? null,
       sourceMode: null,
       toolchain: runner.artifactKind === "wasm" ? toolchains : null,
+      ...(runner.experimental ? {
+        experimental: true,
+        semanticNotes: runner.semanticNotes,
+        compilerProvenance: compilerProvenance[name] ?? null,
+      } : {}),
       status: "ok",
     };
     entry.runners[name] = rec;
@@ -342,13 +371,21 @@ for (const bench of benches) {
     let argv;
     let cwd = BUILD_DIR;
     if (runner.mode === "compiled") {
-      if (runner.artifactKind === "wasm") {
+      if (runner.artifactKind === "wasm" || runner.sourcePolicy === "original") {
         const canonicalSource = path.join(BENCH_DIR, bench);
         rec.sourceMode = "original";
         rec.sourcePath = path.relative(ROOT, canonicalSource);
         rec.sourceSha256 = createHash("sha256").update(readFileSync(canonicalSource)).digest("hex");
       }
       const b = await build(name, runner, bench);
+      if (runner.compilerProvenance) {
+        rec.compileCommand = b.compileCommand;
+        rec.compilerProvenance = b.compilerProvenance;
+        if (b.ok) {
+          rec.artifactPath = path.relative(ROOT, b.outPath);
+          rec.artifactSha256 = createHash("sha256").update(readFileSync(b.outPath)).digest("hex");
+        }
+      }
       rec.buildMs = b.buildMs;
       rec.binBytes = b.binBytes ?? null;
       rec.moduleBytes = b.moduleBytes ?? null;
@@ -358,7 +395,11 @@ for (const bench of benches) {
         // Without a successful manifest, the attempted compiler input is unverified.
         // In particular, AssemblyScript may have compiled a generated adaptation.
         if (b.phase === "adapt") rec.sourceMode = "adaptation rejected";
-        else if (runner.artifactKind === "wasm" && runner.sourcePolicy !== "original") rec.sourceMode = null;
+        else if (runner.compilerProvenance && b.phase === "setup") {
+          rec.sourceMode = null;
+          rec.sourcePath = null;
+          rec.sourceSha256 = null;
+        } else if (runner.artifactKind === "wasm" && runner.sourcePolicy !== "original") rec.sourceMode = null;
         Object.assign(rec, { status: b.status, phase: b.phase, error: b.error, signal: b.signal, exitCode: b.exitCode, peakKb: b.peakKb });
         console.log(`${rec.status.toUpperCase()}  ${(b.error ?? "").slice(0, 80)}`);
         flush();
@@ -385,6 +426,7 @@ for (const bench of benches) {
         rec.sourceMode = runner.sourcePolicy === "original" ? "original" : null;
       }
       argv = runner.runArtifact ? runner.runArtifact(b.outPath) : [b.outPath];
+      if (runner.compilerProvenance) rec.runtimeCommand = argv;
       if (runner.artifactKind === "wasm") {
         cwd = ROOT;
         rec.runtimeCommand = argv;

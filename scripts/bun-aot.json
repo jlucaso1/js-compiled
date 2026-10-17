@@ -1,0 +1,10 @@
+{
+  "pr": 45631,
+  "commit": "54c5048fbca1416685e833a0c46976c277f80ac2",
+  "bunPrVersion": "1.0.42",
+  "binarySha256": "e0ac0a188c1454a01bdbb61846c7e915d0125e77a3db5c26757ce4ecca754d86",
+  "platform": "linux",
+  "arch": "x64",
+  "artifactUrl": "https://buildkite.com/organizations/bun/pipelines/bun/builds/127754/jobs/01a14be1-024f-4bef-897f-b96f491de55f/artifacts/01a14be7-e174-46d1-bfbd-1a828680a8f2",
+  "buildUrl": "https://buildkite.com/bun/bun/builds/127754"
+}
