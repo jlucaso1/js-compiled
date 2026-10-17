@@ -227,3 +227,14 @@ test("Bun AOT rejects a successful compiler exit that emitted no executable", { 
     assert.equal(record.output, undefined);
   });
 });
+
+
+test("benchmark workflow gates AOT setup and verifies bundled bytes before version reporting", () => {
+  const workflow = readFileSync(path.join(ROOT, ".github", "workflows", "benchmark.yml"), "utf8");
+  const condition = "inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,')";
+  for (const step of ["Install checksum-pinned experimental Bun AOT compiler", "Record verified experimental Bun AOT provenance"]) {
+    assert.ok(workflow.includes(`- name: ${step}\n        if: ${condition}\n`), `${step} must only run when AOT is selected`);
+  }
+  assert.doesNotMatch(workflow, /^\s+vendor\/bun-aot\/bun\s/m, "never query the bundled executable before its checksum/provenance verifier");
+  assert.match(workflow, /console\.log\(JSON\.stringify\(verifyBunAotToolchain\(\)/);
+});
