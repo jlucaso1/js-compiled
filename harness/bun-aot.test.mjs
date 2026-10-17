@@ -235,6 +235,7 @@ test("benchmark workflow gates AOT setup and verifies bundled bytes before versi
   for (const step of ["Install checksum-pinned experimental Bun AOT compiler", "Record verified experimental Bun AOT provenance"]) {
     assert.ok(workflow.includes(`- name: ${step}\n        if: ${condition}\n`), `${step} must only run when AOT is selected`);
   }
+  assert.ok(workflow.includes(`-aot-\${{ ${condition} }}-`), "stable-only cache saves must not prevent AOT cache population");
   assert.doesNotMatch(workflow, /^\s+vendor\/bun-aot\/bun\s/m, "never query the bundled executable before its checksum/provenance verifier");
   assert.match(workflow, /console\.log\(JSON\.stringify\(verifyBunAotToolchain\(\)/);
 });

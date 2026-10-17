@@ -63,6 +63,23 @@ jobs:
           name: bun-aot-smoke
           path: results/bun-aot-smoke.json
 
+  deno-compile-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26.12.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - run: npm ci
+      - name: Verify both standalone engines exclude unrelated npm dependencies
+        run: DENO_COMPILE_INTEGRATION=1 node --test harness/deno-compile.test.mjs
+
   jz-native-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -183,7 +183,8 @@ export const RUNNERS = {
     tier: "extra",
     mode: "compiled",
     version: ["deno", "--version"],
-    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "-o", out, file],
+    // Fixtures use built-ins only. Do not embed the harness's npm toolchains.
+    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--no-npm", "-o", out, file],
   },
 
   "deno-compile-quickjs": {
@@ -191,7 +192,7 @@ export const RUNNERS = {
     tier: "extra",
     mode: "compiled",
     version: ["deno", "--version"],
-    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--engine", "quickjs", "-o", out, file],
+    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--no-npm", "--engine", "quickjs", "-o", out, file],
   },
 
   deno: {

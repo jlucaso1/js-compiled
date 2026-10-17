@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh', 'scripts/setup-bun-aot.sh', 'scripts/bun-aot.json') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-aot-${{ inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,') }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh', 'scripts/setup-bun-aot.sh', 'scripts/bun-aot.json') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 

@@ -39,6 +39,13 @@ Extras, enabled with `--runners=all`:
 compilers: they embed the whole runtime. They are here to anchor the binary-size
 column against the real AOT output.
 
+Both Deno compile runners pass `--no-npm`: the canonical fixtures use built-ins,
+including `node:fs`, and do not import npm packages. This prevents Deno from
+embedding the harness's unrelated `node_modules` compiler toolchains in every
+executable. With Deno 2.9.7 installed, run
+`DENO_COMPILE_INTEGRATION=1 node --test harness/deno-compile.test.mjs` to check
+dependency isolation and standalone `node:fs` output for both engines.
+
 Porffor, Static Hermes, and QuickJS-ng are vendored from git. Local setup and the benchmark workflow
 both use the Porffor commit pinned in [`scripts/setup.sh`](scripts/setup.sh).
 Hermes uses an immutable commit from `static_h`, and QuickJS-ng uses an immutable
