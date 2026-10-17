@@ -230,7 +230,7 @@ test("Bun AOT rejects a successful compiler exit that emitted no executable", { 
 
 
 test("benchmark workflow gates AOT setup and verifies bundled bytes before version reporting", () => {
-  const workflow = readFileSync(path.join(ROOT, ".github", "workflows", "benchmark.yml"), "utf8");
+  const workflow = readFileSync(path.join(ROOT, ".github", "workflows", "benchmark.yml"), "utf8").replaceAll("\r\n", "\n");
   const condition = "inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,')";
   for (const step of ["Install checksum-pinned experimental Bun AOT compiler", "Record verified experimental Bun AOT provenance"]) {
     assert.ok(workflow.includes(`- name: ${step}\n        if: ${condition}\n`), `${step} must only run when AOT is selected`);
