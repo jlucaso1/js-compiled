@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/
-          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh') }}
+          key: vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-${{ needs.plan.outputs.porffor_ref }}-${{ needs.plan.outputs.quickjs_ref }}-aot-${{ inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,') }}-${{ hashFiles('scripts/setup.sh', 'scripts/setup-jz-native.sh', 'scripts/setup-wasm.sh', 'scripts/setup-bun-aot.sh', 'scripts/bun-aot.json') }}
           restore-keys: |
             vendor-${{ runner.os }}-${{ needs.plan.outputs.os_image }}-${{ needs.plan.outputs.hermes_ref }}-
 
@@ -91,6 +91,14 @@ jobs:
         run: |
           npm ci
           ./scripts/setup.sh
+
+      - uses: oven-sh/setup-bun@v2
+        if: inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,')
+        with:
+          bun-version: 1.4.3
+      - name: Install checksum-pinned experimental Bun AOT compiler
+        if: inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,')
+        run: ./scripts/setup-bun-aot.sh
 
       - name: Package vendored toolchains
         run: tar -czf vendor-bundle.tar.gz vendor/
@@ -168,6 +176,14 @@ jobs:
           node harness/wasm-version.mjs js2wasm
           node harness/wasm-version.mjs assemblyscript
           node harness/run.mjs --list
+
+      - name: Record verified experimental Bun AOT provenance
+        if: inputs.runners == '' || inputs.runners == 'all' || contains(format(',{0},', inputs.runners), ',bun-aot,')
+        run: |
+          node --input-type=module <<'NODE'
+          import { verifyBunAotToolchain } from "./harness/bun-aot-toolchain.mjs";
+          console.log(JSON.stringify(verifyBunAotToolchain(), null, 2));
+          NODE
 
       - name: Run benchmark
         run: |

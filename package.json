@@ -13,12 +13,14 @@
   "type": "module",
   "dependencies": {
     "@assemblyscript/wasi-shim": "0.1.0",
-    "@geastack/compiler": "1.0.33",
+    "@geastack/compiler": "1.0.34",
+    "@geastack/core": "0.1.44",
+    "@geastack/host": "0.1.18",
     "@loopdive/js2": "0.71.0",
     "@perryts/perry": "0.5.1520",
     "assemblyscript": "0.28.20",
     "binaryen": "132.0.0",
-    "scriptc": "0.3.2",
+    "scriptc": "0.3.6",
     "typescript": "7.0.2"
   },
   "overrides": {

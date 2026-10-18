@@ -78,3 +78,46 @@ test("merge rejects shards with different pinned runner versions", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+for (const field of ["commit", "binarySha256", "artifactUrl", "revision"]) {
+  test(`merge rejects Bun AOT shards with different compiler ${field}`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "merge-bun-aot-"));
+    try {
+      const shards = path.join(dir, "shards");
+      mkdirSync(shards);
+      const a = shard("00-noop.ts", "2026-01-01T00:00:00.000Z", { node: "v24", "bun-aot": "1.4.4" });
+      const b = shard("01-hello.ts", "2026-01-01T00:01:00.000Z", { node: "v24", "bun-aot": "1.4.4" });
+      a.meta.bunAot = { commit: "a".repeat(40), binarySha256: "b".repeat(64), artifactUrl: "https://example.test/one", revision: "1.4.4+aaaaaaa" };
+      b.meta.bunAot = { ...a.meta.bunAot, [field]: "different" };
+      a.meta.selectedRunners = b.meta.selectedRunners = ["node", "bun-aot"];
+      writeFileSync(path.join(shards, "a.json"), JSON.stringify(a));
+      writeFileSync(path.join(shards, "b.json"), JSON.stringify(b));
+      const result = merge(shards, path.join(dir, "merged.json"));
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /incompatible shard toolchain\/options metadata/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("merge retains identical Bun AOT compiler provenance per shard", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "merge-bun-aot-identical-"));
+  try {
+    const shards = path.join(dir, "shards");
+    mkdirSync(shards);
+    const a = shard("00-noop.ts", "2026-01-01T00:00:00.000Z");
+    const b = shard("01-hello.ts", "2026-01-01T00:01:00.000Z");
+    a.meta.bunAot = b.meta.bunAot = { commit: "a".repeat(40), binarySha256: "b".repeat(64), revision: "1.4.4+aaaaaaa" };
+    writeFileSync(path.join(shards, "a.json"), JSON.stringify(a));
+    writeFileSync(path.join(shards, "b.json"), JSON.stringify(b));
+    const output = path.join(dir, "merged.json");
+    const result = merge(shards, output);
+    assert.equal(result.status, 0, result.stderr);
+    const merged = JSON.parse(readFileSync(output, "utf8"));
+    assert.deepEqual(merged.meta.bunAot, a.meta.bunAot);
+    assert.deepEqual(merged.meta.shards.map((s) => s.bunAot), [a.meta.bunAot, b.meta.bunAot]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

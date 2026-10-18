@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { WASMTIME, makeWasmtimeCommand, wasmtimeBytes, wasmtimeVersion } from "./wasm-toolchain.mjs";
+import { BUN_AOT, verifyBunAotToolchain } from "./bun-aot-toolchain.mjs";
 
 export const ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = (n) => path.join(ROOT, "node_modules", ".bin", n);
@@ -160,12 +161,30 @@ export const RUNNERS = {
     compile: (file, out) => ["bun", "build", "--compile", "--outfile", out, file],
   },
 
+  "bun-aot": {
+    label: "Bun AOT (experimental PR #45631)",
+    tier: "extra",
+    mode: "compiled",
+    experimental: true,
+    sourcePolicy: "original",
+    semanticNotes: [
+      "Type assertions perform runtime conversions",
+      "Typed boundaries validate values at runtime",
+      "Built-ins are immutable",
+    ],
+    requires: BUN_AOT,
+    version: [BUN_AOT, "--version"],
+    compilerProvenance: verifyBunAotToolchain,
+    compile: (file, out) => [BUN_AOT, "build", "--compile", "--aot", "--compile-trim-runtime", "--outfile", out, file],
+  },
+
   "deno-compile": {
     label: "deno compile",
     tier: "extra",
     mode: "compiled",
     version: ["deno", "--version"],
-    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "-o", out, file],
+    // Fixtures use built-ins only. Do not embed the harness's npm toolchains.
+    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--no-npm", "-o", out, file],
   },
 
   "deno-compile-quickjs": {
@@ -173,7 +192,7 @@ export const RUNNERS = {
     tier: "extra",
     mode: "compiled",
     version: ["deno", "--version"],
-    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--engine", "quickjs", "-o", out, file],
+    compile: (file, out) => ["deno", "compile", "-A", "--no-check", "--no-npm", "--engine", "quickjs", "-o", out, file],
   },
 
   deno: {
@@ -197,6 +216,9 @@ function commandExists(command) {
 
 export function missingDependency(name) {
   const r = RUNNERS[name];
+  if (name === "bun-aot") {
+    try { verifyBunAotToolchain(); } catch (error) { return `unverified experimental Bun AOT: ${error.message} (run scripts/setup-bun-aot.sh)`; }
+  }
   if (r.requires && !existsSync(r.requires)) return r.requires;
   if (name === "geatsc" && !commandExists(CXX)) return `${CXX} (C++20 compiler; set CXX)`;
   if (name === "js2wasm" || name === "assemblyscript") {

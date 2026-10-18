@@ -34,7 +34,7 @@ else
 fi
 
 # Static Hermes: immutable revision of the supported static_h branch.
-HERMES_REF="${HERMES_REF:-763886c5dc8a95946b187dc65a27387eb00410f7}"
+HERMES_REF="${HERMES_REF:-17b37301da5da4a2cd55d78f9697c46c0fd96123}"
 HERMES_COMMIT_FILE="vendor/hermes/.hermes_commit"
 BUILT_COMMIT_FILE="vendor/hermes/build/.built_commit"
 
@@ -80,7 +80,7 @@ else
 fi
 
 # QuickJS-ng
-QUICKJS_REF="${QUICKJS_REF:-9b061718955874e648d8c2bf2910a717aac8fa63}"
+QUICKJS_REF="${QUICKJS_REF:-5271a40beffef45e2eaccc8d22969cac9a4b394c}"
 QUICKJS_COMMIT_FILE="vendor/quickjs/.quickjs_commit"
 BUILT_QUICKJS_COMMIT_FILE="vendor/quickjs/build/.built_commit"
 
