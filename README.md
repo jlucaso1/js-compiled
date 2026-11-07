@@ -26,7 +26,7 @@ Extras, enabled with `--runners=all`:
 | `porffor-js` | Porffor fed the same program with type annotations stripped |
 | `shermes` | [facebook/hermes](https://github.com/facebook/hermes) (`static_h` branch) — AOT JS/TS → Hermes IR → C → native |
 | `quickjs-ng` | [quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs) — compiles JS to standalone executable bundling bytecode and engine |
-| `bun-aot` | Experimental [Bun PR #45631](https://github.com/oven-sh/bun/pull/45631), `bun build --compile --aot --compile-trim-runtime`; machine code with a trimmed runtime |
+| `bun-aot` | [oven-sh/bun](https://github.com/oven-sh/bun) [Ahead-of-time compilation](https://bun.com/docs/compiler/aot), `bun compile --compile --aot --trim --explain=trim --explain=missed-optimizations`; machine code with a trimmed runtime |
 | `bun-compile` | `bun build --compile` — bundles the code **with the engine** |
 | `deno-compile` | `deno compile` (V8) — same idea |
 | `deno-compile-quickjs` | `deno compile --engine quickjs` — smaller, experimental engine |
